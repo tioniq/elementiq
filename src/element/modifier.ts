@@ -1,4 +1,4 @@
-import {ElementOptions} from "../types/element";
+import {ElementOptions} from "@/types/element";
 
 export interface Modifier {
   (element: HTMLElement, elementOptions?: ElementOptions): void

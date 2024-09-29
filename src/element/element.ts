@@ -1,7 +1,7 @@
-import {ElementChildren, ElementDataset, ElementOptions, ElementStyle} from "../types/element";
-import {domListenKey, runMutationObserver} from "../lifecycle";
-import {getObjectValuesChanges, StringArrayKeyOf} from "../diff/object";
-import {getArrayChanges} from "../diff/array";
+import {ElementChildren, ElementDataset, ElementOptions, ElementStyle, ElementValue} from "@/types/element";
+import {domListenKey, runMutationObserver} from "@/lifecycle";
+import {getObjectValuesChanges, StringArrayKeyOf} from "@/diff/object";
+import {getArrayChanges} from "@/diff/array";
 import {
   createDisposiq,
   DisposableAction,
@@ -22,7 +22,7 @@ declare global {
   }
 }
 
-export function element<K extends keyof HTMLElementTagNameMap>(tag: K, elementOptions?: ElementOptions<HTMLElementTagNameMap[K]>): HTMLElementTagNameMap[K] {
+export function element<K extends keyof HTMLElementTagNameMap>(tag: K, elementOptions?: ElementOptions<HTMLElementTagNameMap[K]>): ElementValue<HTMLElementTagNameMap[K]> {
   const element = document.createElement(tag)
   if (elementOptions == undefined) {
     element[propsKey] = noProps
