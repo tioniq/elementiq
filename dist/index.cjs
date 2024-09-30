@@ -23,6 +23,8 @@ __export(src_exports, {
   a: () => a,
   abbr: () => abbr,
   addModifier: () => addModifier,
+  addRawStyle: () => addRawStyle,
+  addStyles: () => addStyles,
   addTagModifier: () => addTagModifier,
   address: () => address,
   applyModification: () => applyModification,
@@ -44,6 +46,7 @@ __export(src_exports, {
   code: () => code,
   col: () => col,
   colgroup: () => colgroup,
+  createController: () => createController,
   data: () => data,
   datalist: () => datalist,
   dd: () => dd,
@@ -87,6 +90,7 @@ __export(src_exports, {
   li: () => li,
   link: () => link,
   main: () => main,
+  makeClassStyles: () => makeClassStyles,
   map: () => map,
   mark: () => mark,
   menu: () => menu,
@@ -104,6 +108,7 @@ __export(src_exports, {
   pre: () => pre,
   progress: () => progress,
   q: () => q,
+  removeAllGeneratedStyles: () => removeAllGeneratedStyles,
   render: () => render,
   renderJsx: () => renderJsx,
   rp: () => rp,
@@ -139,6 +144,7 @@ __export(src_exports, {
   track: () => track,
   u: () => u,
   ul: () => ul,
+  useController: () => useController,
   var_: () => var_,
   video: () => video,
   wbr: () => wbr
@@ -1665,9 +1671,163 @@ function wbr(options) {
   return element("wbr", options);
 }
 
+// src/controller/index.ts
+var setHandler = Symbol("setHandler");
+function createController() {
+  let ref = void 0;
+  const obj = {};
+  return new Proxy(obj, {
+    get(target, p2, receiver) {
+      if (p2 === setHandler) {
+        return (handler) => {
+          if (ref !== void 0) {
+            console.error("Controller used multiple times");
+          }
+          ref = handler;
+        };
+      }
+      if (ref === void 0) {
+        throw new Error("Controller is not in use");
+      }
+      const value = ref[p2];
+      if (value instanceof Function) {
+        return function() {
+          return value.apply(ref, arguments);
+        };
+      }
+      return ref[p2];
+    }
+  });
+}
+function useController(controller, handler) {
+  if (!controller) {
+    return;
+  }
+  controller[setHandler](handler);
+}
+
 // src/render/index.ts
 function render(value, parent) {
   parent.appendChild(value);
+}
+
+// src/styles/index.ts
+var _addedStyles = [];
+function addRawStyle(rawCss) {
+  return _addRawStyle(rawCss);
+}
+function addStyles(styles) {
+  return _addStyles(styles);
+}
+var _classNames = /* @__PURE__ */ new Map();
+function makeClassStyles(styles, disposable) {
+  const result = {};
+  const stylesResult = [];
+  for (let key in styles) {
+    key = key.trim();
+    const style2 = styles[key];
+    if (key.indexOf(" ") !== -1 || key.indexOf(".") !== -1 || key.indexOf(">") !== -1 || key.indexOf(":") !== -1) {
+      let kKey = getFirstWord(key);
+      const classCounter = _classNames.get(kKey);
+      if (classCounter === void 0) {
+        console.error("Invalid class name", key);
+        continue;
+      }
+      const className2 = kKey + classCounter;
+      stylesResult.push({
+        rule: "." + className2 + key.substring(kKey.length),
+        declaration: style2
+      });
+      continue;
+    }
+    const existingClassCounter = _classNames.get(key);
+    let className = key;
+    if (existingClassCounter === void 0) {
+      _classNames.set(key, 1);
+      className += "1";
+    } else {
+      _classNames.set(key, existingClassCounter + 1);
+      className += (existingClassCounter + 1).toString();
+    }
+    stylesResult.push({
+      rule: "." + className,
+      declaration: style2
+    });
+    result[key] = className;
+  }
+  const subscription = _addStyles(stylesResult);
+  if (disposable) {
+    disposable.add(subscription);
+  }
+  return result;
+}
+function removeAllGeneratedStyles() {
+  const styles = [..._addedStyles];
+  _addedStyles.length = 0;
+  for (let style2 of styles) {
+    style2.remove();
+  }
+}
+function _addRawStyle(rawCss) {
+  const style2 = document.createElement("style");
+  style2.id = generateStyleId();
+  style2.textContent = rawCss;
+  return attachStyleElement(style2);
+}
+function _addStyles(styles) {
+  const style2 = document.createElement("style");
+  style2.textContent = "\n";
+  style2.id = generateStyleId();
+  const attachSubscription = attachStyleElement(style2);
+  for (let style1 of styles) {
+    const styleData = getStyleDeclaration(style1.declaration);
+    style2.sheet.insertRule(`${style1.rule} { ${styleData.cssText} }`, style2.sheet.cssRules.length);
+  }
+  return attachSubscription;
+}
+function attachStyleElement(style2) {
+  const head2 = document.head;
+  head2.appendChild(style2);
+  _addedStyles.push(style2);
+  return new DisposableAction(() => {
+    const index = _addedStyles.indexOf(style2);
+    if (index !== -1) {
+      _addedStyles.splice(index, 1);
+    }
+    head2.removeChild(style2);
+  });
+}
+function getStyleDeclaration(style2) {
+  const span2 = document.createElement("span");
+  const spanStyle = span2.style;
+  let key;
+  for (key in style2) {
+    spanStyle[key] = style2[key];
+  }
+  return spanStyle;
+}
+var styleIdCounter = 0;
+function generateStyleId() {
+  return "elemiq-style-" + ++styleIdCounter;
+}
+function getFirstWord(str) {
+  for (let i2 = 0; i2 < str.length; i2++) {
+    const charCode = str.charCodeAt(i2);
+    let aLetter = charCode >= 65 && charCode < 91 || charCode >= 97 && charCode < 123;
+    if (aLetter) {
+      continue;
+    }
+    let aDigit = charCode >= 48 && charCode < 58;
+    if (aDigit) {
+      continue;
+    }
+    let isUnderscoreOrHyphen = charCode === 95 || charCode === 45;
+    if (isUnderscoreOrHyphen) {
+      continue;
+    }
+    return str.substring(0, i2);
+  }
+  return str;
 }
 
 // src/jsx-runtime/render.ts
@@ -1692,6 +1852,8 @@ var jsxDEV = renderJsx;
   a,
   abbr,
   addModifier,
+  addRawStyle,
+  addStyles,
   addTagModifier,
   address,
   applyModification,
@@ -1713,6 +1875,7 @@ var jsxDEV = renderJsx;
   code,
   col,
   colgroup,
+  createController,
   data,
   datalist,
   dd,
@@ -1756,6 +1919,7 @@ var jsxDEV = renderJsx;
   li,
   link,
   main,
+  makeClassStyles,
   map,
   mark,
   menu,
@@ -1773,6 +1937,7 @@ var jsxDEV = renderJsx;
   pre,
   progress,
   q,
+  removeAllGeneratedStyles,
   render,
   renderJsx,
   rp,
@@ -1808,6 +1973,7 @@ var jsxDEV = renderJsx;
   track,
   u,
   ul,
+  useController,
   var_,
   video,
   wbr

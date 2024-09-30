@@ -1,4 +1,4 @@
-import { DisposableLike } from '@tioniq/disposiq';
+import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
 import { Variable } from '@tioniq/eventiq';
 
 type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? A : B;
@@ -101,6 +101,13 @@ type ElementOptions<T extends HTMLElement = HTMLElement> = VariableOrValue<Eleme
 };
 type StubElement = Symbol;
 type ElementValue<T extends HTMLElement = HTMLElement> = T;
+
+type StyleDeclaration = Partial<CSSStyleDeclaration>;
+interface Style {
+    rule: string;
+    declaration: StyleDeclaration;
+}
+type ClassNameMap<ClassKey extends string = string> = Record<ClassKey, string>;
 
 declare global {
     interface HTMLElement {
@@ -233,14 +240,15 @@ declare function var_(options?: ElementOptions<HTMLElement>): ElementValue<HTMLE
 declare function video(options?: ElementOptions<HTMLVideoElement>): ElementValue<HTMLVideoElement>;
 declare function wbr(options?: ElementOptions<HTMLElement>): ElementValue<HTMLElement>;
 
-type StyleDeclaration = Partial<CSSStyleDeclaration>;
-interface Style {
-    rule: string;
-    declaration: StyleDeclaration;
-}
-type ClassNameMap<ClassKey extends string = string> = Record<ClassKey, string>;
+declare function createController<T extends object>(): T;
+declare function useController<T>(controller: T, handler: T): void;
 
 declare function render<T extends HTMLElement>(value: ElementValue<T>, parent: HTMLElement): void;
+
+declare function addRawStyle(rawCss: string): IDisposable;
+declare function addStyles(styles: Style[]): IDisposable;
+declare function makeClassStyles<ClassKey extends string = string>(styles: Record<ClassKey, StyleDeclaration>, disposable?: IDisposablesContainer): ClassNameMap<ClassKey>;
+declare function removeAllGeneratedStyles(): void;
 
 type FunctionComponent = (props: Record<string, unknown>) => ElementValue;
 
@@ -258,4 +266,4 @@ declare const jsxDEV: typeof renderJsx;
 declare function renderJsx<TProps extends object>(func: (props?: TProps) => JSX.Element, props: TProps, _key?: string): JSX.Element;
 declare function renderJsx<K extends keyof HTMLElementTagNameMap>(tag: K, props: ElementOptions<HTMLElementTagNameMap[K]>, _key?: string): JSX.Element;
 
-export { type ClassNameMap, type ElementChildren, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type VariableOrValue, type WritableKeys, a, abbr, addModifier, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, var_, video, wbr };
+export { type ClassNameMap, type ElementChildren, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type VariableOrValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, var_, video, wbr };
