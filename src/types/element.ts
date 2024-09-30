@@ -82,8 +82,13 @@ export type VariableOrValue<Type extends Record<string, any>> = {
   [P in keyof Type]: Type[P] | Variable<Type[P]>
 }
 
+export type ElementController<T extends HTMLElement = HTMLElement> = {
+  [P in keyof T as (T[P] extends Function ? P : never)]?: T[P]
+}
+
 export type ElementOptions<T extends HTMLElement = HTMLElement> = VariableOrValue<ElementProps<T>> & {
   parent?: ParentNode
+  controller?: ElementController<T>
 }
 
 export type StubElement = Symbol

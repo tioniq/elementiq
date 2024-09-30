@@ -1,4 +1,11 @@
-import {ElementChildren, ElementDataset, ElementOptions, ElementStyle, ElementValue} from "@/types/element";
+import {
+  ElementChildren,
+  ElementController,
+  ElementDataset,
+  ElementOptions,
+  ElementStyle,
+  ElementValue
+} from "@/types/element";
 import {domListenKey, runMutationObserver} from "@/lifecycle";
 import {getObjectValuesChanges, StringArrayKeyOf} from "@/diff/object";
 import {getArrayChanges} from "@/diff/array";
@@ -12,9 +19,11 @@ import {
 } from "@tioniq/disposiq";
 import {isVariableOf, LazyVariable, Var, VarOrVal} from "@tioniq/eventiq";
 import {applyModification} from "./modifier";
+import {useController} from "@/controller";
 
 const propsKey = "_elemiqProps"
 const noProps = Object.freeze({})
+const emptyStringArray: string[] = []
 
 declare global {
   interface HTMLElement {
@@ -59,6 +68,10 @@ function applyOptions<K extends keyof HTMLElementTagNameMap, E extends HTMLEleme
     }
     if (key === "dataset") {
       applyDataset(element, lifecycle, value)
+      continue
+    }
+    if (key === "controller") {
+      applyController(element, value)
       continue
     }
     if (key.startsWith("on")) {
@@ -211,19 +224,19 @@ function applyClasses(element: HTMLElement, lifecycle: Var<boolean>, classes: Va
     element.classList.add(...classes)
     return
   }
-  let previousClasses: string[] = []
+  let previousClasses: string[] = emptyStringArray
   lifecycle.subscribeDisposable(active => {
     return !active
       ? emptyDisposable
       : classes.subscribe(newClasses => {
-        if (!newClasses) {
+        if (!Array.isArray(newClasses) || newClasses.length === 0) {
           if (previousClasses.length === 0) {
             return
           }
           for (let i = 0; i < previousClasses.length; ++i) {
             element.classList.remove(previousClasses[i])
           }
-          previousClasses = newClasses
+          previousClasses = emptyStringArray
           return
         }
         if (previousClasses.length === 0) {
@@ -294,6 +307,10 @@ function applyDataset(element: HTMLElement, lifecycle: Var<boolean>, dataset: Va
         }
       }
     }))
+}
+
+function applyController<T extends HTMLElement>(element: T, controller: ElementController<T>) {
+  useController(controller, element)
 }
 
 type OnMountHandler = (this: HTMLElement) => IDisposable | void
