@@ -145,6 +145,7 @@ __export(src_exports, {
   u: () => u,
   ul: () => ul,
   useController: () => useController,
+  useFunctionController: () => useFunctionController,
   var_: () => var_,
   video: () => video,
   wbr: () => wbr
@@ -912,7 +913,7 @@ var ExceptionHandlerManager = class {
 };
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
-// src/element/element.ts
+// src/element/index.ts
 var import_eventiq2 = require("@tioniq/eventiq");
 
 // src/element/modifier.ts
@@ -938,9 +939,57 @@ function applyModification(element2, elementOptions) {
   }
 }
 
-// src/element/element.ts
+// src/controller/index.ts
+var setHandler = Symbol("setHandler");
+function createController() {
+  let ref = void 0;
+  const obj = {};
+  return new Proxy(obj, {
+    get(target, p2, receiver) {
+      if (p2 === setHandler) {
+        return (handler) => {
+          if (ref !== void 0) {
+            console.error("Controller used multiple times");
+          }
+          ref = handler;
+        };
+      }
+      if (ref === void 0) {
+        throw new Error("Controller is not in use");
+      }
+      return ref(p2);
+    }
+  });
+}
+function useController(controller, handler) {
+  if (!controller) {
+    return;
+  }
+  controller[setHandler]((key) => {
+    const value = handler[key];
+    if (value instanceof Function) {
+      return function() {
+        return value.apply(handler, arguments);
+      };
+    }
+    return value;
+  });
+}
+function useFunctionController(controller, handler) {
+  if (!controller) {
+    return;
+  }
+  controller[setHandler]((key) => {
+    return function() {
+      return handler(key, arguments);
+    };
+  });
+}
+
+// src/element/index.ts
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
+var emptyStringArray = [];
 function element(tag, elementOptions) {
   const element2 = document.createElement(tag);
   if (elementOptions == void 0) {
@@ -977,6 +1026,10 @@ function applyOptions(element2, elementOptions, lifecycle) {
     }
     if (key === "dataset") {
       applyDataset(element2, lifecycle, value);
+      continue;
+    }
+    if (key === "controller") {
+      applyController(element2, value);
       continue;
     }
     if (key.startsWith("on")) {
@@ -1126,17 +1179,17 @@ function applyClasses(element2, lifecycle, classes) {
     element2.classList.add(...classes);
     return;
   }
-  let previousClasses = [];
+  let previousClasses = emptyStringArray;
   lifecycle.subscribeDisposable((active) => {
     return !active ? emptyDisposable : classes.subscribe((newClasses) => {
-      if (!newClasses) {
+      if (!Array.isArray(newClasses) || newClasses.length === 0) {
         if (previousClasses.length === 0) {
           return;
         }
         for (let i2 = 0; i2 < previousClasses.length; ++i2) {
           element2.classList.remove(previousClasses[i2]);
         }
-        previousClasses = newClasses;
+        previousClasses = emptyStringArray;
         return;
       }
       if (previousClasses.length === 0) {
@@ -1203,6 +1256,9 @@ function applyDataset(element2, lifecycle, dataset) {
       }
     }
   }));
+}
+function applyController(element2, controller) {
+  useController(controller, element2);
 }
 function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
@@ -1671,41 +1727,6 @@ function wbr(options) {
   return element("wbr", options);
 }
 
-// src/controller/index.ts
-var setHandler = Symbol("setHandler");
-function createController() {
-  let ref = void 0;
-  const obj = {};
-  return new Proxy(obj, {
-    get(target, p2, receiver) {
-      if (p2 === setHandler) {
-        return (handler) => {
-          if (ref !== void 0) {
-            console.error("Controller used multiple times");
-          }
-          ref = handler;
-        };
-      }
-      if (ref === void 0) {
-        throw new Error("Controller is not in use");
-      }
-      const value = ref[p2];
-      if (value instanceof Function) {
-        return function() {
-          return value.apply(ref, arguments);
-        };
-      }
-      return ref[p2];
-    }
-  });
-}
-function useController(controller, handler) {
-  if (!controller) {
-    return;
-  }
-  controller[setHandler](handler);
-}
-
 // src/render/index.ts
 function render(value, parent) {
   parent.appendChild(value);
@@ -1974,6 +1995,7 @@ var jsxDEV = renderJsx;
   u,
   ul,
   useController,
+  useFunctionController,
   var_,
   video,
   wbr

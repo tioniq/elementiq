@@ -96,8 +96,12 @@ type ElementProps<T extends HTMLElement = HTMLElement> = {
 type VariableOrValue<Type extends Record<string, any>> = {
     [P in keyof Type]: Type[P] | Variable<Type[P]>;
 };
+type ElementController<T extends HTMLElement = HTMLElement> = {
+    [P in keyof T as (T[P] extends Function ? P : never)]?: T[P];
+};
 type ElementOptions<T extends HTMLElement = HTMLElement> = VariableOrValue<ElementProps<T>> & {
     parent?: ParentNode;
+    controller?: ElementController<T>;
 };
 type StubElement = Symbol;
 type ElementValue<T extends HTMLElement = HTMLElement> = T;
@@ -242,6 +246,7 @@ declare function wbr(options?: ElementOptions<HTMLElement>): ElementValue<HTMLEl
 
 declare function createController<T extends object>(): T;
 declare function useController<T>(controller: T, handler: T): void;
+declare function useFunctionController<T>(controller: T, handler: (key: keyof T, ...args: any[]) => any): void;
 
 declare function render<T extends HTMLElement>(value: ElementValue<T>, parent: HTMLElement): void;
 
@@ -266,4 +271,4 @@ declare const jsxDEV: typeof renderJsx;
 declare function renderJsx<TProps extends object>(func: (props?: TProps) => JSX.Element, props: TProps, _key?: string): JSX.Element;
 declare function renderJsx<K extends keyof HTMLElementTagNameMap>(tag: K, props: ElementOptions<HTMLElementTagNameMap[K]>, _key?: string): JSX.Element;
 
-export { type ClassNameMap, type ElementChildren, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type VariableOrValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, var_, video, wbr };
+export { type ClassNameMap, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type VariableOrValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, useFunctionController, var_, video, wbr };
