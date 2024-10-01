@@ -1858,10 +1858,25 @@ function renderJsx(tag, props, _key) {
       innerText: "Not supported tag '" + tag + "'"
     });
   }
-  if (typeof tag === "function") {
-    return tag(props);
+  if (typeof tag === "string") {
+    return element(tag, props);
   }
-  return element(tag, props);
+  if (typeof tag !== "function") {
+    return span({
+      innerText: "Not supported tag '" + tag + "'"
+    });
+  }
+  if (isClassComponent(tag)) {
+    const instance = new tag(props);
+    return instance.render();
+  }
+  return tag(props);
+}
+function isClassComponent(tag) {
+  if (tag.prototype === void 0) {
+    return false;
+  }
+  return "render" in tag.prototype;
 }
 
 // src/jsx-runtime/index.ts
