@@ -78,8 +78,10 @@ export type ElementProps<T extends HTMLElement = HTMLElement> = {
   onMount?: (this: T) => DisposableLike | void
 }
 
+export type NonUndefined<T> = T extends undefined ? never : T;
+
 export type VariableOrValue<Type extends Record<string, any>> = {
-  [P in keyof Type]: Type[P] | Variable<Type[P]>
+  [P in keyof Type]: Type[P] | Variable<Type[P]> | Variable<NonUndefined<Type[P]>>
 }
 
 export type ElementController<T extends HTMLElement = HTMLElement> = {
