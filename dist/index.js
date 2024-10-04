@@ -1223,7 +1223,7 @@ function createVarNode(value) {
       previousChild = childNode;
       return;
     }
-    parent.insertBefore(previousChild, childNode);
+    parent.insertBefore(childNode, previousChild);
     parent.removeChild(previousChild);
     previousChild = childNode;
   });
