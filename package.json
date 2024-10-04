@@ -1,6 +1,6 @@
 {
   "name": "@tioniq/elementiq",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "",
   "author": {
     "email": "timoniann@gmail.com",
@@ -51,7 +51,7 @@
     "./dist": "./dist"
   },
   "dependencies": {
-    "@tioniq/eventiq": "^1.0.6"
+    "@tioniq/eventiq": "^1.1.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.1",
