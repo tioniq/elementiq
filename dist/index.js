@@ -323,7 +323,7 @@ var AsyncDisposableAction = class extends AsyncDisposiq {
     });
   }
 };
-var Node = class {
+var Node2 = class {
   constructor(value) {
     this.value = value;
     this.next = null;
@@ -336,7 +336,7 @@ var Queue = class {
     this.length = 0;
   }
   enqueue(value) {
-    const node = new Node(value);
+    const node = new Node2(value);
     if (this.head) {
       this.tail.next = node;
       this.tail = node;
@@ -923,97 +923,110 @@ function applyChildren(element2, lifecycle, children) {
   if (!children) {
     return;
   }
-  if (!isVariableOf(children)) {
-    setElementChildren(element2, children);
-    return;
-  }
   lifecycle.subscribeDisposable((active) => {
     if (!active) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore();
-    let previousChildrenOpts = void 0;
-    let childrenNodes;
-    disposables.add(children.subscribe((newChildrenOpts) => {
-      if (newChildrenOpts === previousChildrenOpts) {
+    let previousElementOpts = [];
+    let addedNodes = [];
+    if (isVariableOf(children)) {
+      disposables.add(children.subscribe(updateChildren));
+    } else {
+      updateChildren(children);
+    }
+    disposables.add(new DisposableAction(() => detachChildren()));
+    return disposables;
+    function updateChildren(newChildrenOpts) {
+      if (!newChildrenOpts || Array.isArray(newChildrenOpts) && newChildrenOpts.length === 0) {
+        previousElementOpts = [];
+        if (addedNodes.length === 0) {
+          return;
+        }
+        for (let i2 = 0; i2 < addedNodes.length; i2++) {
+          const addedNode = addedNodes[i2];
+          addedNode.disposable.dispose();
+          element2.removeChild(addedNode.node);
+        }
+        addedNodes = [];
         return;
       }
-      if (!previousChildrenOpts) {
-        childrenNodes = setElementChildren(element2, newChildrenOpts);
-        previousChildrenOpts = newChildrenOpts;
+      const newElementOpts = Array.isArray(newChildrenOpts) ? [...newChildrenOpts] : [newChildrenOpts];
+      if (addedNodes.length === 0) {
+        addedNodes = [];
+        for (let i2 = 0; i2 < newElementOpts.length; i2++) {
+          const child = newElementOpts[i2];
+          if (isVariableOf(child)) {
+            const [childNode2, disposable] = createVarNode(child);
+            element2.appendChild(childNode2);
+            addedNodes.push({ node: childNode2, disposable, value: child });
+            continue;
+          }
+          const childNode = createNode(child);
+          element2.appendChild(childNode);
+          addedNodes.push({ node: childNode, disposable: emptyDisposable, value: child });
+        }
         return;
       }
-      if (!newChildrenOpts) {
-        element2.innerHTML = "";
-        childrenNodes = [];
-        previousChildrenOpts = newChildrenOpts;
-        return;
-      }
-      const newChildrenOptsType = typeof newChildrenOpts;
-      if (typeof previousChildrenOpts !== newChildrenOptsType) {
-        detachChildren();
-        childrenNodes = setElementChildren(element2, newChildrenOpts);
-        previousChildrenOpts = newChildrenOpts;
-        return;
-      }
-      if (!Array.isArray(newChildrenOpts) || !Array.isArray(previousChildrenOpts)) {
-        detachChildren();
-        childrenNodes = setElementChildren(element2, newChildrenOpts);
-        previousChildrenOpts = newChildrenOpts;
-        return;
-      }
-      const newChildrenOptsLength = newChildrenOpts.length;
-      const previousChildrenOptsLength = previousChildrenOpts.length;
-      if (newChildrenOptsLength === 0) {
-        detachChildren();
-        previousChildrenOpts = newChildrenOpts;
-        return;
-      }
-      if (previousChildrenOptsLength === 0) {
-        childrenNodes = setElementChildren(element2, newChildrenOpts);
-        previousChildrenOpts = newChildrenOpts;
-        return;
-      }
-      const changes = getArrayChanges(previousChildrenOpts, newChildrenOpts);
+      const changes = getArrayChanges(previousElementOpts, newElementOpts);
       if (changes.remove.length > 0) {
         for (let i2 = changes.remove.length - 1; i2 >= 0; --i2) {
           const remove = changes.remove[i2];
-          const child = childrenNodes[remove.index];
-          childrenNodes.splice(remove.index, 1);
-          element2.removeChild(child);
+          const addedNodeIndex = remove.index;
+          const addedNode = addedNodes[addedNodeIndex];
+          addedNodes.splice(addedNodeIndex, 1);
+          addedNode.disposable.dispose();
+          element2.removeChild(addedNode.node);
         }
       }
       for (let i2 = 0; i2 < changes.add.length; ++i2) {
         const add = changes.add[i2];
-        const child = newChildrenOpts[add.index];
-        const childNode = typeof child === "string" ? document.createTextNode(child) : child;
-        const previousNode = childrenNodes[add.index];
-        childrenNodes.splice(add.index, 0, childNode);
-        if (add.index >= childrenNodes.length) {
-          element2.appendChild(childNode);
-          continue;
+        const child = newElementOpts[add.index];
+        let addedNode;
+        if (isVariableOf(child)) {
+          const [childNode, disposable] = createVarNode(child);
+          addedNode = {
+            node: childNode,
+            disposable,
+            value: child
+          };
+        } else {
+          const childNode = createNode(child);
+          addedNode = {
+            node: childNode,
+            disposable: emptyDisposable,
+            value: child
+          };
         }
-        element2.insertBefore(childNode, previousNode);
+        if (add.index >= addedNodes.length) {
+          element2.appendChild(addedNode.node);
+        } else {
+          const previousNode = addedNodes[add.index].node;
+          element2.insertBefore(addedNode.node, previousNode);
+        }
+        addedNodes.splice(add.index, 0, addedNode);
       }
       for (let i2 = 0; i2 < changes.swap.length; ++i2) {
         const swap = changes.swap[i2];
-        const child = childrenNodes[swap.index];
-        const nextChild = childrenNodes[swap.newIndex];
+        const child = addedNodes[swap.index];
+        const nextChild = addedNodes[swap.newIndex];
         swapNodes(child, nextChild);
+        addedNodes[swap.index] = nextChild;
+        addedNodes[swap.newIndex] = child;
       }
-      previousChildrenOpts = newChildrenOpts;
-    }));
-    disposables.add(new DisposableAction(() => detachChildren()));
-    return disposables;
+      previousElementOpts = newElementOpts;
+    }
     function detachChildren() {
       var _a;
-      if (childrenNodes) {
-        for (let i2 = 0; i2 < childrenNodes.length; i2++) {
-          let child = childrenNodes[i2];
-          (_a = child.parentNode) == null ? void 0 : _a.removeChild(child);
-        }
-        childrenNodes = [];
+      if (addedNodes.length === 0) {
+        return;
       }
+      for (let i2 = 0; i2 < addedNodes.length; i2++) {
+        let child = addedNodes[i2];
+        child.disposable.dispose();
+        (_a = child.node.parentNode) == null ? void 0 : _a.removeChild(child.node);
+      }
+      addedNodes = [];
     }
   });
 }
@@ -1171,64 +1184,44 @@ function listenObjectKVChanges(variable, handler) {
   handler(null, currentState);
   return subscription;
 }
-function swapNodes(node1, node2) {
-  const parent = node1.parentNode;
-  const nextSibling = node2.nextSibling;
-  if (nextSibling === node1) {
-    parent == null ? void 0 : parent.insertBefore(node1, node2);
+function swapNodes(child1, child2) {
+  const parent = child1.node.parentNode;
+  const nextSibling = child2.node.nextSibling;
+  if (nextSibling === child1.node) {
+    parent == null ? void 0 : parent.insertBefore(child1.node, child2.node);
   } else {
-    parent == null ? void 0 : parent.insertBefore(node2, node1);
-    parent == null ? void 0 : parent.insertBefore(node1, nextSibling);
+    parent == null ? void 0 : parent.insertBefore(child2.node, child1.node);
+    parent == null ? void 0 : parent.insertBefore(child1.node, nextSibling);
   }
 }
-function setElementChildren(element2, children) {
-  if (Array.isArray(children)) {
-    if (children.length === 0) {
-      return [];
+function createNode(value) {
+  if (!value) {
+    return document.createDocumentFragment();
+  }
+  if (value instanceof Node) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return document.createTextNode(value);
+  }
+  console.warn("Unsupported type of value.", { value });
+  return createEmptyNode();
+}
+function createVarNode(value) {
+  const fragment = document.createDocumentFragment();
+  let previousChild = null;
+  const disposable = value.subscribe((newValue) => {
+    const childNode = createNode(newValue);
+    if (previousChild) {
+      fragment.removeChild(previousChild);
     }
-    let parent = element2;
-    let result = [];
-    for (let child of children) {
-      if (!child) {
-        continue;
-      }
-      const childNode = typeof child === "string" ? document.createTextNode(child) : child;
-      parent.append(childNode);
-      result.push(childNode);
-    }
-    return result;
-  }
-  if (typeof children === "string") {
-    element2.innerText = children;
-    return nodeListToArray(element2.childNodes);
-  }
-  if (typeof children === "object") {
-    element2.appendChild(children);
-    return [children];
-  }
-  if (typeof children === "boolean") {
-    return [createEmptyNode()];
-  }
-  if (typeof children === "number") {
-    console.error("Number is not supported as a child of an element.");
-  } else {
-    console.error(`Unsupported type '${typeof children}' of children.`);
-  }
-  return [createEmptyNode()];
+    fragment.appendChild(childNode);
+    previousChild = childNode;
+  });
+  return [fragment, disposable];
 }
 function createEmptyNode() {
   return document.createTextNode("");
-}
-function nodeListToArray(nodeList) {
-  const size = nodeList.length;
-  if (size === 0) {
-    return [];
-  }
-  const nodes = new Array(size);
-  for (let i2 = 0; i2 < size; i2++) {
-    nodes[i2] = nodeList[i2];
-  }
-  return nodes;
 }
 runMutationObserver();
 
@@ -1575,6 +1568,11 @@ function wbr(options) {
 
 // src/render/index.ts
 function render(value, parent) {
+  if (typeof value === "function") {
+    const element2 = value({});
+    parent.appendChild(element2);
+    return;
+  }
   parent.appendChild(value);
 }
 
