@@ -409,10 +409,7 @@ export function tfoot(options?: ElementOptions<HTMLTableSectionElement>): Elemen
   return element("tfoot", options)
 }
 
-/**
- * @deprecated
- */
-export function th(options?: ElementOptions<HTMLTableHeaderCellElement>): ElementValue<HTMLTableHeaderCellElement> {
+export function th(options?: ElementOptions<HTMLTableCellElement>): ElementValue<HTMLTableCellElement> {
   return element("th", options)
 }
 
@@ -454,4 +451,129 @@ export function video(options?: ElementOptions<HTMLVideoElement>): ElementValue<
 
 export function wbr(options?: ElementOptions<HTMLElement>): ElementValue<HTMLElement> {
   return element("wbr", options)
+}
+
+export const elements = {
+  rootElement: {
+    html
+  },
+  metadataAndScripting: {
+    head,
+    title,
+    meta,
+    base,
+    link,
+    style,
+    noscript,
+    script,
+  },
+  embeddingContent: {
+    img,
+    area,
+    map,
+    embed,
+    object,
+    source,
+    iframe,
+    canvas,
+    track,
+    audio,
+    video,
+  },
+  textLevelSemantics: {
+    span,
+    a,
+    rt,
+    dfn,
+    em,
+    i,
+    small,
+    ins,
+    s,
+    rp,
+    abbr,
+    time,
+    b,
+    strong,
+    del,
+    kbd,
+    q,
+    var_,
+    sub,
+    mark,
+    bdi,
+    wbr,
+    cite,
+    samp,
+    sup,
+    ruby,
+    bdo,
+    code,
+  },
+  groupingContent: {
+    div,
+    pre,
+    br,
+    p,
+    blockquote,
+    hr,
+    ol,
+    dl,
+    figcaption,
+    ul,
+    dt,
+    figure,
+    li,
+    dd,
+  },
+  forms: {
+    form,
+    fieldset,
+    meter,
+    select,
+    legend,
+    optgroup,
+    label,
+    option,
+    datalist,
+    input,
+    output,
+    textarea,
+    button,
+    progress,
+  },
+  documentSections: {
+    body,
+    h1,
+    section,
+    aside,
+    h2,
+    header,
+    address,
+    h3,
+    nav,
+    h4,
+    article,
+    h5,
+    footer,
+    h6,
+    hgroup,
+  },
+  tabularData: {
+    table,
+    col,
+    tbody,
+    colgroup,
+    tr,
+    caption,
+    td,
+    thead,
+    th,
+    tfoot,
+  },
+  interactiveElements: {
+    menu,
+    summary,
+    details,
+  },
 }
