@@ -1,4 +1,5 @@
 import {
+  ElementChild,
   ElementChildren,
   ElementController,
   ElementDataset,
@@ -121,99 +122,119 @@ function applyChildren(element: HTMLElement, lifecycle: Var<boolean>, children: 
   if (!children) {
     return
   }
-  if (!isVariableOf<ElementChildren>(children)) {
-    setElementChildren(element, children)
-    return
-  }
   lifecycle.subscribeDisposable(active => {
     if (!active) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore()
-    let previousChildrenOpts: ElementChildren = undefined
-    let childrenNodes: Node[]
-    disposables.add(children.subscribe(newChildrenOpts => {
-      if (newChildrenOpts === previousChildrenOpts) {
+    let previousElementOpts: VarOrVal<ElementChild>[] = []
+    let addedNodes: AddedChild[] = []
+    if (isVariableOf<ElementChildren>(children)) {
+      disposables.add(children.subscribe(updateChildren))
+    } else {
+      updateChildren(children)
+    }
+    disposables.add(new DisposableAction(() => detachChildren()))
+    return disposables;
+
+    function updateChildren(newChildrenOpts: ElementChildren) {
+      if (!newChildrenOpts || (Array.isArray(newChildrenOpts) && newChildrenOpts.length === 0)) {
+        previousElementOpts = []
+        if (addedNodes.length === 0) {
+          return
+        }
+        for (let i = 0; i < addedNodes.length; i++) {
+          const addedNode = addedNodes[i]
+          addedNode.disposable.dispose()
+          element.removeChild(addedNode.node)
+        }
+        addedNodes = []
         return
       }
-      if (!previousChildrenOpts) {
-        childrenNodes = setElementChildren(element, newChildrenOpts)
-        previousChildrenOpts = newChildrenOpts
+      const newElementOpts: VarOrVal<ElementChild>[] = Array.isArray(newChildrenOpts) ? [...newChildrenOpts] : [newChildrenOpts]
+      if (addedNodes.length === 0) {
+        addedNodes = []
+        for (let i = 0; i < newElementOpts.length; i++) {
+          const child = newElementOpts[i]
+          if (isVariableOf<ElementChild>(child)) {
+            const [childNode, disposable] = createVarNode(child)
+            element.appendChild(childNode)
+            addedNodes.push({node: childNode, disposable, value: child})
+            continue
+          }
+          const childNode = createNode(child)
+          element.appendChild(childNode)
+          addedNodes.push({node: childNode, disposable: emptyDisposable, value: child})
+        }
         return
       }
-      if (!newChildrenOpts) {
-        element.innerHTML = ""
-        childrenNodes = []
-        previousChildrenOpts = newChildrenOpts
-        return
-      }
-      const newChildrenOptsType = typeof newChildrenOpts
-      if (typeof previousChildrenOpts !== newChildrenOptsType) {
-        detachChildren()
-        childrenNodes = setElementChildren(element, newChildrenOpts)
-        previousChildrenOpts = newChildrenOpts
-        return
-      }
-      if (!Array.isArray(newChildrenOpts) || !Array.isArray(previousChildrenOpts)) {
-        detachChildren()
-        childrenNodes = setElementChildren(element, newChildrenOpts)
-        previousChildrenOpts = newChildrenOpts
-        return
-      }
-      const newChildrenOptsLength = newChildrenOpts.length
-      const previousChildrenOptsLength = previousChildrenOpts.length
-      if (newChildrenOptsLength === 0) {
-        detachChildren()
-        previousChildrenOpts = newChildrenOpts
-        return
-      }
-      if (previousChildrenOptsLength === 0) {
-        childrenNodes = setElementChildren(element, newChildrenOpts)
-        previousChildrenOpts = newChildrenOpts
-        return
-      }
-      const changes = getArrayChanges(previousChildrenOpts, newChildrenOpts)
+      const changes = getArrayChanges(previousElementOpts, newElementOpts)
       if (changes.remove.length > 0) {
         for (let i = changes.remove.length - 1; i >= 0; --i) {
           const remove = changes.remove[i]
-          const child = childrenNodes[remove.index]
-          childrenNodes.splice(remove.index, 1)
-          element.removeChild(child)
+          const addedNodeIndex = remove.index
+          const addedNode = addedNodes[addedNodeIndex]
+          addedNodes.splice(addedNodeIndex, 1)
+          addedNode.disposable.dispose()
+          element.removeChild(addedNode.node)
         }
       }
       for (let i = 0; i < changes.add.length; ++i) {
         const add = changes.add[i]
-        const child = newChildrenOpts[add.index]
-        const childNode = typeof child === "string" ? document.createTextNode(child) : child
-        const previousNode = childrenNodes[add.index]
-        childrenNodes.splice(add.index, 0, childNode)
-        if (add.index >= childrenNodes.length) {
-          element.appendChild(childNode)
-          continue
+        const child = newElementOpts[add.index]
+        let addedNode: AddedChild
+        if (isVariableOf<ElementChild>(child)) {
+          const [childNode, disposable] = createVarNode(child)
+          addedNode = {
+            node: childNode,
+            disposable,
+            value: child
+          }
+        } else {
+          const childNode = createNode(child)
+          addedNode = {
+            node: childNode,
+            disposable: emptyDisposable,
+            value: child
+          }
         }
-        element.insertBefore(childNode, previousNode)
+        if (add.index >= addedNodes.length) {
+          element.appendChild(addedNode.node)
+        } else {
+          const previousNode = addedNodes[add.index].node
+          element.insertBefore(addedNode.node, previousNode)
+        }
+        addedNodes.splice(add.index, 0, addedNode)
       }
       for (let i = 0; i < changes.swap.length; ++i) {
         const swap = changes.swap[i]
-        const child = childrenNodes[swap.index]
-        const nextChild = childrenNodes[swap.newIndex]
+        const child = addedNodes[swap.index]
+        const nextChild = addedNodes[swap.newIndex]
         swapNodes(child, nextChild)
+        addedNodes[swap.index] = nextChild
+        addedNodes[swap.newIndex] = child
       }
-      previousChildrenOpts = newChildrenOpts
-    }))
-    disposables.add(new DisposableAction(() => detachChildren()))
-    return disposables;
+      previousElementOpts = newElementOpts
+    }
 
     function detachChildren() {
-      if (childrenNodes) {
-        for (let i = 0; i < childrenNodes.length; i++) {
-          let child = childrenNodes[i]
-          child.parentNode?.removeChild(child)
-        }
-        childrenNodes = []
+      if (addedNodes.length === 0) {
+        return;
       }
+      for (let i = 0; i < addedNodes.length; i++) {
+        let child = addedNodes[i]
+        child.disposable.dispose()
+        child.node.parentNode?.removeChild(child.node)
+      }
+      addedNodes = []
     }
   })
+}
+
+interface AddedChild {
+  node: Node
+  disposable: IDisposable
+  value: VarOrVal<ElementChild>
 }
 
 function applyClasses(element: HTMLElement, lifecycle: Var<boolean>, classes: VarOrVal<string[]>) {
@@ -391,68 +412,47 @@ function listenObjectKVChanges<T extends Record<string, any>>(variable: Var<T>, 
   return subscription
 }
 
-function swapNodes(node1: Node, node2: Node) {
-  const parent = node1.parentNode
-  const nextSibling = node2.nextSibling
-  if (nextSibling === node1) {
-    parent?.insertBefore(node1, node2)
+function swapNodes(child1: AddedChild, child2: AddedChild) {
+  const parent = child1.node.parentNode
+  const nextSibling = child2.node.nextSibling
+  if (nextSibling === child1.node) {
+    parent?.insertBefore(child1.node, child2.node)
   } else {
-    parent?.insertBefore(node2, node1)
-    parent?.insertBefore(node1, nextSibling)
+    parent?.insertBefore(child2.node, child1.node)
+    parent?.insertBefore(child1.node, nextSibling)
   }
 }
 
-function setElementChildren(element: HTMLElement, children: ElementChildren): Node[] {
-  if (Array.isArray(children)) {
-    if (children.length === 0) {
-      return []
+function createNode(value: ElementChild): Node {
+  if (!value) {
+    return document.createDocumentFragment()
+  }
+  if (value instanceof Node) {
+    return value
+  }
+  if (typeof value === "string") {
+    return document.createTextNode(value)
+  }
+  console.warn("Unsupported type of value.", {value})
+  return createEmptyNode()
+}
+
+function createVarNode(value: Var<ElementChild>): [Node, IDisposable] {
+  const fragment = document.createDocumentFragment()
+  let previousChild: Node | null = null
+  const disposable = value.subscribe(newValue => {
+    const childNode = createNode(newValue)
+    if (previousChild) {
+      fragment.removeChild(previousChild)
     }
-    // TODO add document.createDocumentFragment()
-    let parent = element
-    let result: Node[] = []
-    for (let child of children) {
-      if (!child) {
-        continue
-      }
-      const childNode = typeof child === "string" ? document.createTextNode(child) : child
-      parent.append(childNode)
-      result.push(childNode)
-    }
-    return result
-  }
-  if (typeof children === "string") {
-    element.innerText = children
-    return nodeListToArray(element.childNodes)
-  }
-  if (typeof children === "object") {
-    element.appendChild(children as Node)
-    return [children as Node]
-  }
-  if (typeof children === "boolean") {
-    return [createEmptyNode()]
-  }
-  if (typeof children === "number") {
-    console.error("Number is not supported as a child of an element.")
-  } else {
-    console.error(`Unsupported type '${typeof children}' of children.`)
-  }
-  return [createEmptyNode()]
+    fragment.appendChild(childNode)
+    previousChild = childNode
+  })
+  return [fragment, disposable]
 }
 
 function createEmptyNode() {
   return document.createTextNode("")
-}
-
-function nodeListToArray(nodeList: NodeList): Node[] {
-  const size = nodeList.length
-  if (size === 0) {
-    return []
-  }
-  const nodes = new Array<Node>(size)
-  for (let i = 0; i < size; i++) {
-    nodes[i] = nodeList[i]
-  }
-  return nodes
 }
 
 runMutationObserver()

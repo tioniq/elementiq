@@ -1,7 +1,7 @@
 import {ObjectWritableProps, WritableKeys} from "./object"
 import {AttachedToDOMEvent, DetachedFromDOMEvent} from "@/lifecycle"
 import {DisposableLike} from "@tioniq/disposiq"
-import {Variable} from "@tioniq/eventiq"
+import {Variable, VarOrVal} from "@tioniq/eventiq"
 
 interface MissingAttributes {
   ariaControls?: string | null
@@ -9,7 +9,15 @@ interface MissingAttributes {
   role?: string | null
 }
 
-export type ElementChildren = (Node | string)[] | Node | string | undefined | null | boolean
+export type NonUndefined<T> = T extends undefined ? never : T;
+
+export type ObjectValuesVariableOrValue<Type extends Record<string, any>> = {
+  [P in keyof Type]: Type[P] | Variable<Type[P]> | Variable<NonUndefined<Type[P]>>
+}
+
+export type ElementChild = Node | string | undefined | null | boolean
+
+export type ElementChildren = Array<VarOrVal<ElementChild>> | ElementChild
 
 export type ElementDataset = Record<string, string>
 
@@ -78,17 +86,11 @@ export type ElementProps<T extends HTMLElement = HTMLElement> = {
   onMount?: (this: T) => DisposableLike | void
 }
 
-export type NonUndefined<T> = T extends undefined ? never : T;
-
-export type VariableOrValue<Type extends Record<string, any>> = {
-  [P in keyof Type]: Type[P] | Variable<Type[P]> | Variable<NonUndefined<Type[P]>>
-}
-
 export type ElementController<T extends HTMLElement = HTMLElement> = {
   [P in keyof T as (T[P] extends Function ? P : never)]?: T[P]
 }
 
-export type ElementOptions<T extends HTMLElement = HTMLElement> = VariableOrValue<ElementProps<T>> & {
+export type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
   parent?: ParentNode
   controller?: ElementController<T>
 }
