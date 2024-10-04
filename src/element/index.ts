@@ -442,10 +442,19 @@ function createVarNode(value: Var<ElementChild>): [Node, IDisposable] {
   let previousChild: Node | null = null
   const disposable = value.subscribe(newValue => {
     const childNode = createNode(newValue)
-    if (previousChild) {
-      fragment.removeChild(previousChild)
+    if (!previousChild) {
+      fragment.appendChild(childNode)
+      previousChild = childNode
+      return
     }
-    fragment.appendChild(childNode)
+    const parent = previousChild.parentNode
+    if (!parent) {
+      fragment.appendChild(childNode)
+      previousChild = childNode
+      return
+    }
+    parent.insertBefore(previousChild, childNode)
+    parent.removeChild(previousChild)
     previousChild = childNode
   })
   return [fragment, disposable]
