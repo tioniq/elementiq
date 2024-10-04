@@ -453,7 +453,7 @@ function createVarNode(value: Var<ElementChild>): [Node, IDisposable] {
       previousChild = childNode
       return
     }
-    parent.insertBefore(previousChild, childNode)
+    parent.insertBefore(childNode, previousChild)
     parent.removeChild(previousChild)
     previousChild = childNode
   })
