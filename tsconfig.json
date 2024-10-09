@@ -1,18 +1,24 @@
 {
   "compilerOptions": {
-    "target": "es2016",
-    "module": "commonjs",
+    "target": "ES2019",
+    "module": "NodeNext",
+    "moduleResolution": "Node16",
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
     "strict": true,
     "skipLibCheck": true,
     "outDir": "dist",
     "paths": {
       "@/*": ["./src/*"]
     },
-    "typeRoots": ["./node_modules/@types"]
+    "typeRoots": ["./node_modules/@types"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "@tioniq/elementiq",
+    "rootDir": "./"
   },
   "include": [
     "src"
-  ]
+  ],
+  "exclude": ["dist"]
 }

@@ -1,5 +1,5 @@
-import {ElementValue} from "@/types/element";
-import {FunctionComponent} from "@/jsx-runtime/types";
+import {ElementValue} from "@/types/element.js";
+import {FunctionComponent} from "@/jsx-runtime/types.js";
 
 export function render<T extends HTMLElement>(value: ElementValue<T> | FunctionComponent, parent: HTMLElement): void {
   if (typeof value === "function") {

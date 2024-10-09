@@ -1,4 +1,4 @@
-import {ElementValue} from "../index";
+import {ElementValue} from "../index.ts";
 
 export type FunctionComponent<P = {}> = (props: P) => ElementValue
 

@@ -20,6 +20,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/index.ts
 var src_exports = {};
 __export(src_exports, {
+  Button: () => Button,
   a: () => a,
   abbr: () => abbr,
   addModifier: () => addModifier,
@@ -58,6 +59,7 @@ __export(src_exports, {
   dl: () => dl,
   dt: () => dt,
   element: () => element,
+  elements: () => elements,
   em: () => em,
   embed: () => embed,
   fieldset: () => fieldset,
@@ -413,9 +415,6 @@ var AbortDisposable = class extends Disposiq {
   get signal() {
     return this._controller.signal;
   }
-  /**
-   * Abort the signal
-   */
   dispose() {
     this._controller.abort();
   }
@@ -461,12 +460,6 @@ var AsyncDisposableAction = class extends AsyncDisposiq {
   get disposed() {
     return this._disposed;
   }
-  /**
-   * Dispose the action. If the action has already been disposed, this is a
-   * no-op.
-   * If the action has not been disposed, the action is invoked and the action
-   * is marked as disposed.
-   */
   dispose() {
     return __async(this, null, function* () {
       if (this._disposed) {
@@ -745,10 +738,6 @@ var DisposableStore = class _DisposableStore extends Disposiq {
       throw new ObjectDisposedException(message);
     }
   }
-  /**
-   * Dispose the store. If the store has already been disposed, this is a no-op.
-   * If the store has not been disposed, all disposables added to the store will be disposed.
-   */
   dispose() {
     if (this._disposed) {
       return;
@@ -864,6 +853,89 @@ function createDisposiq(disposableLike) {
   }
   return emptyDisposable;
 }
+var DisposableMapStore = class extends Disposiq {
+  constructor() {
+    super(...arguments);
+    this._map = /* @__PURE__ */ new Map();
+    this._disposed = false;
+  }
+  /**
+   * Get the disposed state of the store
+   */
+  get disposed() {
+    return this._disposed;
+  }
+  /**
+   * Set a disposable value for the key. If the store contains a value for the key, the previous value will be disposed.
+   * If the store is disposed, the value will be disposed immediately
+   * @param key the key
+   * @param value the disposable value
+   */
+  set(key, value) {
+    const disposable = createDisposable(value);
+    if (this._disposed) {
+      disposable.dispose();
+      return;
+    }
+    const prev = this._map.get(key);
+    this._map.set(key, disposable);
+    prev == null ? void 0 : prev.dispose();
+  }
+  /**
+   * Get the disposable value for the key
+   * @param key the key
+   * @returns the disposable value or undefined if the key is not found
+   */
+  get(key) {
+    if (this._disposed) {
+      return;
+    }
+    return this._map.get(key);
+  }
+  /**
+   * Delete the disposable value for the key
+   * @param key the key
+   * @returns true if the key was found and the value was deleted, false otherwise
+   */
+  delete(key) {
+    if (this._disposed) {
+      return false;
+    }
+    const disposable = this._map.get(key);
+    if (!disposable) {
+      return false;
+    }
+    this._map.delete(key);
+    disposable.dispose();
+    return true;
+  }
+  /**
+   * Remove the disposable value for the key and return it. The disposable value will not be disposed
+   * @param key the key
+   * @returns the disposable value or undefined if the key is not found
+   */
+  extract(key) {
+    if (this._disposed) {
+      return;
+    }
+    const disposable = this._map.get(key);
+    if (!disposable) {
+      return;
+    }
+    this._map.delete(key);
+    return disposable;
+  }
+  dispose() {
+    if (this._disposed) {
+      return;
+    }
+    this._disposed = true;
+    for (const value of this._map.values()) {
+      value.dispose();
+    }
+    this._map.clear();
+  }
+};
 Disposiq.prototype.disposeWith = function(container) {
   return container.add(this);
 };
@@ -914,7 +986,7 @@ var ExceptionHandlerManager = class {
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
 // src/element/index.ts
-var import_eventiq2 = require("@tioniq/eventiq");
+var import_eventiq3 = require("@tioniq/eventiq");
 
 // src/element/modifier.ts
 var modifiers = [];
@@ -984,6 +1056,195 @@ function useFunctionController(controller, handler) {
       return handler(key, arguments);
     };
   });
+}
+
+// src/element/children.ts
+var import_eventiq2 = require("@tioniq/eventiq");
+function applyChildren(element2, lifecycle, children) {
+  if (!children) {
+    return;
+  }
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable;
+    }
+    const disposables = new DisposableStore();
+    let controller = null;
+    if ((0, import_eventiq2.isVariableOf)(children)) {
+      disposables.add(children.subscribe(updateChildren));
+    } else {
+      updateChildren(children);
+    }
+    disposables.add(new DisposableAction(() => {
+      if (controller) {
+        controller.remove();
+        controller = null;
+      }
+    }));
+    return disposables;
+    function updateChildren(newChildrenOpts) {
+      if (!controller) {
+        controller = setChildren(newChildrenOpts, element2, null);
+        return;
+      }
+      controller = controller.replace(newChildrenOpts);
+    }
+  });
+}
+function setChildren(children, element2, mark2) {
+  if (Array.isArray(children)) {
+    if (children.length === 0) {
+      return {
+        replace(child) {
+          return setChildren(child, element2, mark2);
+        },
+        remove() {
+        }
+      };
+    }
+    children = [...children];
+    const controllers = [];
+    const beginMark = createEmptyNode();
+    element2.insertBefore(beginMark, mark2);
+    let slots = new Array(children.length);
+    for (let i2 = 0; i2 < children.length; i2++) {
+      let slot2 = createEmptyNode();
+      element2.insertBefore(slot2, mark2);
+      slots[i2] = slot2;
+      const child = children[i2];
+      const controller = setChildren(child, element2, slot2);
+      controllers.push(controller);
+    }
+    return {
+      replace(child) {
+        if (!Array.isArray(child)) {
+          const controller = setChildren(child, element2, slots[slots.length - 1]);
+          this.remove();
+          return controller;
+        }
+        if (child.length === 0) {
+          const slot2 = createEmptyNode();
+          element2.insertBefore(slot2, slots[slot2.length - 1]);
+          this.remove();
+          return {
+            replace(child2) {
+              const controller = setChildren(child2, element2, slot2);
+              this.remove();
+              return controller;
+            },
+            remove() {
+              element2.removeChild(slot2);
+              element2.removeChild(beginMark);
+            }
+          };
+        }
+        child = [...child];
+        const changes = getArrayChanges(children, child);
+        for (let i2 = changes.remove.length - 1; i2 >= 0; --i2) {
+          const remove = changes.remove[i2];
+          controllers[remove.index].remove();
+          element2.removeChild(slots[remove.index]);
+          slots.splice(remove.index, 1);
+          controllers.splice(remove.index, 1);
+        }
+        for (let i2 = 0; i2 < changes.add.length; i2++) {
+          const add = changes.add[i2];
+          const slot2 = createEmptyNode();
+          const elementToInsertAfter = add.index === 0 ? beginMark : slots[add.index - 1];
+          insertAfter(slot2, elementToInsertAfter);
+          const controller = setChildren(child[add.index], element2, slot2);
+          slots.splice(add.index, 0, slot2);
+          controllers.splice(add.index, 0, controller);
+        }
+        for (let i2 = 0; i2 < changes.swap.length; i2++) {
+          const swap = changes.swap[i2];
+          const controller = controllers[swap.index];
+          const slot2 = slots[swap.index];
+          controllers[swap.index] = controllers[swap.newIndex];
+          slots[swap.index] = slots[swap.newIndex];
+          controllers[swap.newIndex] = controller;
+          slots[swap.newIndex] = slot2;
+        }
+        children = child;
+        return this;
+      },
+      remove() {
+        for (let i2 = 0; i2 < controllers.length; i2++) {
+          controllers[i2].remove();
+        }
+        for (let i2 = 0; i2 < slots.length; i2++) {
+          element2.removeChild(slots[i2]);
+        }
+        element2.removeChild(beginMark);
+      }
+    };
+  }
+  if ((0, import_eventiq2.isVariableOf)(children)) {
+    const slot2 = createEmptyNode();
+    element2.insertBefore(slot2, mark2);
+    let lastController = null;
+    const subscription = children.subscribe((c) => {
+      if (lastController) {
+        lastController = lastController.replace(c);
+      } else {
+        lastController = setChildren(c, element2, slot2);
+      }
+    });
+    return {
+      replace(child) {
+        subscription.dispose();
+        const controller = setChildren(child, element2, slot2);
+        if (lastController) {
+          lastController.remove();
+        }
+        lastController = controller;
+        return controller;
+      },
+      remove() {
+        subscription.dispose();
+        element2.removeChild(slot2);
+      }
+    };
+  }
+  const node = createNode(children);
+  element2.insertBefore(node, mark2);
+  return {
+    replace(child) {
+      const controller = setChildren(child, element2, node);
+      element2.removeChild(node);
+      return controller;
+    },
+    remove() {
+      element2.removeChild(node);
+    }
+  };
+}
+function createNode(value) {
+  if (!value) {
+    return createEmptyNode();
+  }
+  if (value instanceof Node) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return document.createTextNode(value);
+  }
+  console.warn("Unsupported type of value.", { value });
+  return createEmptyNode();
+}
+function insertAfter(node, after) {
+  const parent = after.parentNode;
+  if (!parent) {
+    return;
+  }
+  if (after.nextSibling) {
+    parent.insertBefore(node, after.nextSibling);
+    return;
+  }
+  parent.appendChild(node);
+}
+function createEmptyNode() {
+  return document.createTextNode("");
 }
 
 // src/element/index.ts
@@ -1056,7 +1317,7 @@ function applyOptions(element2, elementOptions, lifecycle) {
   }
 }
 function createLifecycle(element2) {
-  return new import_eventiq2.LazyVariable((vary) => {
+  return new import_eventiq3.LazyVariable((vary) => {
     element2.dataset[domListenKey] = "t";
     const attachListener = function() {
       vary.value = true;
@@ -1073,123 +1334,12 @@ function createLifecycle(element2) {
     });
   }, () => element2.isConnected);
 }
-function applyChildren(element2, lifecycle, children) {
-  if (!children) {
-    return;
-  }
-  lifecycle.subscribeDisposable((active) => {
-    if (!active) {
-      return emptyDisposable;
-    }
-    const disposables = new DisposableStore();
-    let previousElementOpts = [];
-    let addedNodes = [];
-    if ((0, import_eventiq2.isVariableOf)(children)) {
-      disposables.add(children.subscribe(updateChildren));
-    } else {
-      updateChildren(children);
-    }
-    disposables.add(new DisposableAction(() => detachChildren()));
-    return disposables;
-    function updateChildren(newChildrenOpts) {
-      if (!newChildrenOpts || Array.isArray(newChildrenOpts) && newChildrenOpts.length === 0) {
-        previousElementOpts = [];
-        if (addedNodes.length === 0) {
-          return;
-        }
-        for (let i2 = 0; i2 < addedNodes.length; i2++) {
-          const addedNode = addedNodes[i2];
-          addedNode.disposable.dispose();
-          element2.removeChild(addedNode.node);
-        }
-        addedNodes = [];
-        return;
-      }
-      const newElementOpts = Array.isArray(newChildrenOpts) ? [...newChildrenOpts] : [newChildrenOpts];
-      if (addedNodes.length === 0) {
-        addedNodes = [];
-        for (let i2 = 0; i2 < newElementOpts.length; i2++) {
-          const child = newElementOpts[i2];
-          if ((0, import_eventiq2.isVariableOf)(child)) {
-            const [childNode2, disposable] = createVarNode(child);
-            element2.appendChild(childNode2);
-            addedNodes.push({ node: childNode2, disposable, value: child });
-            continue;
-          }
-          const childNode = createNode(child);
-          element2.appendChild(childNode);
-          addedNodes.push({ node: childNode, disposable: emptyDisposable, value: child });
-        }
-        return;
-      }
-      const changes = getArrayChanges(previousElementOpts, newElementOpts);
-      if (changes.remove.length > 0) {
-        for (let i2 = changes.remove.length - 1; i2 >= 0; --i2) {
-          const remove = changes.remove[i2];
-          const addedNodeIndex = remove.index;
-          const addedNode = addedNodes[addedNodeIndex];
-          addedNodes.splice(addedNodeIndex, 1);
-          addedNode.disposable.dispose();
-          element2.removeChild(addedNode.node);
-        }
-      }
-      for (let i2 = 0; i2 < changes.add.length; ++i2) {
-        const add = changes.add[i2];
-        const child = newElementOpts[add.index];
-        let addedNode;
-        if ((0, import_eventiq2.isVariableOf)(child)) {
-          const [childNode, disposable] = createVarNode(child);
-          addedNode = {
-            node: childNode,
-            disposable,
-            value: child
-          };
-        } else {
-          const childNode = createNode(child);
-          addedNode = {
-            node: childNode,
-            disposable: emptyDisposable,
-            value: child
-          };
-        }
-        if (add.index >= addedNodes.length) {
-          element2.appendChild(addedNode.node);
-        } else {
-          const previousNode = addedNodes[add.index].node;
-          element2.insertBefore(addedNode.node, previousNode);
-        }
-        addedNodes.splice(add.index, 0, addedNode);
-      }
-      for (let i2 = 0; i2 < changes.swap.length; ++i2) {
-        const swap = changes.swap[i2];
-        const child = addedNodes[swap.index];
-        const nextChild = addedNodes[swap.newIndex];
-        swapNodes(child, nextChild);
-        addedNodes[swap.index] = nextChild;
-        addedNodes[swap.newIndex] = child;
-      }
-      previousElementOpts = newElementOpts;
-    }
-    function detachChildren() {
-      var _a;
-      if (addedNodes.length === 0) {
-        return;
-      }
-      for (let i2 = 0; i2 < addedNodes.length; i2++) {
-        let child = addedNodes[i2];
-        child.disposable.dispose();
-        (_a = child.node.parentNode) == null ? void 0 : _a.removeChild(child.node);
-      }
-      addedNodes = [];
-    }
-  });
-}
 function applyClasses(element2, lifecycle, classes) {
   if (!classes) {
     return;
   }
-  if (!(0, import_eventiq2.isVariableOf)(classes)) {
-    element2.classList.add(...classes);
+  if (!(0, import_eventiq3.isVariableOf)(classes)) {
+    element2.classList.add(...classes.filter((c) => !!c));
     return;
   }
   let previousClasses = emptyStringArray;
@@ -1205,53 +1355,93 @@ function applyClasses(element2, lifecycle, classes) {
         previousClasses = emptyStringArray;
         return;
       }
+      const newValues = [...newClasses.filter((c) => !!c)];
       if (previousClasses.length === 0) {
-        element2.classList.add(...newClasses);
-        previousClasses = newClasses;
+        element2.classList.add.apply(element2.classList, newValues);
+        previousClasses = newValues;
         return;
       }
-      const changes = getArrayChanges(previousClasses, newClasses);
+      const changes = getArrayChanges(previousClasses, newValues);
       for (let i2 = 0; i2 < changes.remove.length; ++i2) {
         element2.classList.remove(changes.remove[i2].item);
       }
       for (let i2 = 0; i2 < changes.add.length; ++i2) {
         element2.classList.add(changes.add[i2].item);
       }
-      previousClasses = newClasses;
+      previousClasses = newValues;
     });
   });
 }
 function applyStyle(element2, lifecycle, style2) {
-  var _a;
   if (!style2) {
     return;
   }
-  if (!(0, import_eventiq2.isVariableOf)(style2)) {
-    let styleKey;
-    for (styleKey in style2) {
-      element2.style[styleKey] = (_a = style2[styleKey]) != null ? _a : "";
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable;
     }
-    return;
-  }
-  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable : listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
-    var _a2;
-    if (keysToDelete !== null) {
-      for (let key of keysToDelete) {
-        element2.style.removeProperty(key);
+    const disposables = new DisposableStore();
+    if ((0, import_eventiq3.isVariableOf)(style2)) {
+      const dispoMapStore = new DisposableMapStore();
+      disposables.add(dispoMapStore);
+      disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
+        if (keysToDelete !== null) {
+          for (let key of keysToDelete) {
+            element2.style.removeProperty(key);
+            dispoMapStore.delete(key);
+          }
+        }
+        if (changesToAddOrModify !== null) {
+          for (let key in changesToAddOrModify) {
+            const value = changesToAddOrModify[key];
+            if ((0, import_eventiq3.isVariableOf)(value)) {
+              dispoMapStore.set(key, value.subscribe((newValue) => {
+                if (newValue === void 0) {
+                  element2.style.removeProperty(key);
+                  return;
+                }
+                element2.style[key] = newValue != null ? newValue : "";
+              }));
+              continue;
+            }
+            dispoMapStore.delete(key);
+            if (value === void 0) {
+              element2.style.removeProperty(key);
+              continue;
+            }
+            element2.style[key] = value != null ? value : "";
+          }
+        }
+      }));
+    } else {
+      let styleKey;
+      for (styleKey in style2) {
+        const value = style2[styleKey];
+        if ((0, import_eventiq3.isVariableOf)(value)) {
+          disposables.add(value.subscribe((newValue) => {
+            if (newValue === void 0) {
+              element2.style.removeProperty(styleKey);
+              return;
+            }
+            element2.style[styleKey] = newValue != null ? newValue : "";
+          }));
+          continue;
+        }
+        if (value === void 0) {
+          element2.style.removeProperty(styleKey);
+          continue;
+        }
+        element2.style[styleKey] = value != null ? value : "";
       }
     }
-    if (changesToAddOrModify !== null) {
-      for (let key in changesToAddOrModify) {
-        element2.style[key] = (_a2 = changesToAddOrModify[key]) != null ? _a2 : "";
-      }
-    }
-  }));
+    return disposables;
+  });
 }
 function applyDataset(element2, lifecycle, dataset) {
   if (!dataset) {
     return;
   }
-  if (!(0, import_eventiq2.isVariableOf)(dataset)) {
+  if (!(0, import_eventiq3.isVariableOf)(dataset)) {
     for (let key in dataset) {
       element2.dataset[key] = dataset[key];
     }
@@ -1277,7 +1467,7 @@ function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
     return;
   }
-  if (!(0, import_eventiq2.isVariableOf)(onMount)) {
+  if (!(0, import_eventiq3.isVariableOf)(onMount)) {
     lifecycle.subscribeDisposable((active) => {
       var _a;
       return active ? createDisposable((_a = onMount.call(element2)) != null ? _a : emptyDisposable) : emptyDisposable;
@@ -1290,7 +1480,10 @@ function applyOnMount(element2, lifecycle, onMount) {
   }));
 }
 function applyProperty(element2, lifecycle, key, value) {
-  if (!(0, import_eventiq2.isVariableOf)(value)) {
+  if (value === void 0) {
+    return;
+  }
+  if (!(0, import_eventiq3.isVariableOf)(value)) {
     element2[key] = value;
     return;
   }
@@ -1302,7 +1495,7 @@ function applyParent(element2, lifecycle, parent) {
   if (!parent) {
     return;
   }
-  if (!(0, import_eventiq2.isVariableOf)(parent)) {
+  if (!(0, import_eventiq3.isVariableOf)(parent)) {
     parent.appendChild(element2);
     return;
   }
@@ -1337,54 +1530,6 @@ function listenObjectKVChanges(variable, handler) {
   });
   handler(null, currentState);
   return subscription;
-}
-function swapNodes(child1, child2) {
-  const parent = child1.node.parentNode;
-  const nextSibling = child2.node.nextSibling;
-  if (nextSibling === child1.node) {
-    parent == null ? void 0 : parent.insertBefore(child1.node, child2.node);
-  } else {
-    parent == null ? void 0 : parent.insertBefore(child2.node, child1.node);
-    parent == null ? void 0 : parent.insertBefore(child1.node, nextSibling);
-  }
-}
-function createNode(value) {
-  if (!value) {
-    return document.createDocumentFragment();
-  }
-  if (value instanceof Node) {
-    return value;
-  }
-  if (typeof value === "string") {
-    return document.createTextNode(value);
-  }
-  console.warn("Unsupported type of value.", { value });
-  return createEmptyNode();
-}
-function createVarNode(value) {
-  const fragment = document.createDocumentFragment();
-  let previousChild = null;
-  const disposable = value.subscribe((newValue) => {
-    const childNode = createNode(newValue);
-    if (!previousChild) {
-      fragment.appendChild(childNode);
-      previousChild = childNode;
-      return;
-    }
-    const parent = previousChild.parentNode;
-    if (!parent) {
-      fragment.appendChild(childNode);
-      previousChild = childNode;
-      return;
-    }
-    parent.insertBefore(childNode, previousChild);
-    parent.removeChild(previousChild);
-    previousChild = childNode;
-  });
-  return [fragment, disposable];
-}
-function createEmptyNode() {
-  return document.createTextNode("");
 }
 runMutationObserver();
 
@@ -1728,6 +1873,130 @@ function video(options) {
 function wbr(options) {
   return element("wbr", options);
 }
+var elements = {
+  rootElement: {
+    html
+  },
+  metadataAndScripting: {
+    head,
+    title,
+    meta,
+    base,
+    link,
+    style,
+    noscript,
+    script
+  },
+  embeddingContent: {
+    img,
+    area,
+    map,
+    embed,
+    object,
+    source,
+    iframe,
+    canvas,
+    track,
+    audio,
+    video
+  },
+  textLevelSemantics: {
+    span,
+    a,
+    rt,
+    dfn,
+    em,
+    i,
+    small,
+    ins,
+    s,
+    rp,
+    abbr,
+    time,
+    b,
+    strong,
+    del,
+    kbd,
+    q,
+    var_,
+    sub,
+    mark,
+    bdi,
+    wbr,
+    cite,
+    samp,
+    sup,
+    ruby,
+    bdo,
+    code
+  },
+  groupingContent: {
+    div,
+    pre,
+    br,
+    p,
+    blockquote,
+    hr,
+    ol,
+    dl,
+    figcaption,
+    ul,
+    dt,
+    figure,
+    li,
+    dd
+  },
+  forms: {
+    form,
+    fieldset,
+    meter,
+    select,
+    legend,
+    optgroup,
+    label,
+    option,
+    datalist,
+    input,
+    output,
+    textarea,
+    button,
+    progress
+  },
+  documentSections: {
+    body,
+    h1,
+    section,
+    aside,
+    h2,
+    header,
+    address,
+    h3,
+    nav,
+    h4,
+    article,
+    h5,
+    footer,
+    h6,
+    hgroup
+  },
+  tabularData: {
+    table,
+    col,
+    tbody,
+    colgroup,
+    tr,
+    caption,
+    td,
+    thead,
+    th,
+    tfoot
+  },
+  interactiveElements: {
+    menu,
+    summary,
+    details
+  }
+};
 
 // src/render/index.ts
 function render(value, parent) {
@@ -1858,6 +2127,168 @@ function getFirstWord(str) {
   return str;
 }
 
+// src/components/Button.tsx
+var import_eventiq6 = require("@tioniq/eventiq");
+
+// src/variable/variable.ts
+var import_eventiq4 = require("@tioniq/eventiq");
+function toVariable(value) {
+  if ((0, import_eventiq4.isVariableOf)(value)) {
+    return value;
+  }
+  return (0, import_eventiq4.createConst)(value != null ? value : null);
+}
+function toDefinedVariable(value, defaultValue) {
+  if ((0, import_eventiq4.isVariableOf)(value)) {
+    return value.map((v) => v != null ? v : defaultValue);
+  }
+  return (0, import_eventiq4.createConst)(value != null ? value : defaultValue);
+}
+
+// src/components/button-styles.ts
+var buttonStyles = makeClassStyles({
+  button: {
+    transitionProperty: "color transform background-color border-color border",
+    transitionTimingFunction: "ease-in-out",
+    cursor: "pointer",
+    userSelect: "none",
+    alignItems: "center",
+    justifyContent: "center",
+    textAlign: "center",
+    fontSize: "medium",
+    transitionDuration: "0.15s",
+    borderRadius: "0.76rem",
+    textTransform: "none",
+    paddingLeft: "1.5rem",
+    paddingRight: "1.5rem",
+    border: "0 solid transparent"
+  },
+  "button:active": {
+    scale: "0.95"
+  },
+  "button:focus": {
+    outlineWidth: "2px"
+  },
+  "button:disabled": {
+    pointerEvents: "none",
+    opacity: "0.5"
+  },
+  "button-size-normal": {
+    padding: "0.375rem 0.75rem",
+    fontSize: "1rem",
+    lineHeight: "1.5",
+    height: "2.5rem",
+    borderRadius: "0.25rem"
+  },
+  "button-size-small": {
+    padding: "0.25rem 0.5rem",
+    fontSize: "0.875rem",
+    lineHeight: "1.5",
+    height: "1.75rem",
+    borderRadius: "0.2rem"
+  },
+  "button-size-large": {
+    padding: "0.5rem 1rem",
+    fontSize: "1.25rem",
+    lineHeight: "1.5",
+    height: "3.5rem",
+    borderRadius: "0.3rem"
+  },
+  buttonGhost: {},
+  "buttonGhost:hover": {
+    backgroundColor: "#282828"
+  }
+});
+
+// src/components/theme-style.ts
+var import_eventiq5 = require("@tioniq/eventiq");
+var theme = new import_eventiq5.Vary("dark");
+function createThemeStyle(theme2) {
+  return {
+    normalColor: new import_eventiq5.Vary("#232323"),
+    primaryColor: new import_eventiq5.Vary("#227093"),
+    secondaryColor: new import_eventiq5.Vary("#706fd3"),
+    successColor: new import_eventiq5.Vary("#33d9b2"),
+    errorColor: new import_eventiq5.Vary("#ff5252"),
+    warningColor: new import_eventiq5.Vary("#ffda79"),
+    infoColor: new import_eventiq5.Vary("#34ace0"),
+    textColor: theme2.map((t) => t === "dark" ? "#ffffff" : "#000000")
+  };
+}
+var themeStyle = createThemeStyle(theme);
+
+// src/components/Button.tsx
+function Button(props) {
+  let controller = props.controller == void 0 ? void 0 : createController();
+  if (controller) {
+    useController(props.controller, {
+      click() {
+        controller.click();
+      },
+      focus() {
+        controller.focus();
+      }
+    });
+  }
+  const variant = toDefinedVariable(props.variant, "normal");
+  const appearance = toDefinedVariable(props.appearance, "normal");
+  const size = toDefinedVariable(props.size, "normal");
+  const classes = (0, import_eventiq6.combine)(
+    (0, import_eventiq6.createConst)(buttonStyles.button),
+    appearance.map((a2) => a2 === "ghost" ? buttonStyles.buttonGhost : ""),
+    size.map((s2) => {
+      var _a;
+      return (_a = buttonStyles[`button-size-${s2}`]) != null ? _a : "";
+    })
+  );
+  const variantColor = variant.switchMap((v) => themeStyle[`${v}Color`]);
+  const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
+  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : (0, import_eventiq6.createConst)("transparent"));
+  const borderColor = variantColor;
+  const textColor = appearance.switchMap((a2) => {
+    switch (a2) {
+      case "solid":
+        return variantColor.map((c) => lightenColor(c, 0.6));
+      case "link":
+      case "ghost":
+      case "outline":
+        return variantColor;
+      default:
+        return themeStyle.textColor;
+    }
+  });
+  const textDecoration = appearance.map((a2) => a2 === "link" ? "underline" : "none");
+  const style2 = toVariable(props.style).map((s2) => ({
+    backgroundColor,
+    color: textColor,
+    borderColor,
+    borderWidth,
+    textDecoration,
+    ...s2 != null ? s2 : {}
+  }));
+  return button({
+    controller,
+    classes,
+    className: props.className,
+    style: style2,
+    onClick: props.onClick,
+    children: props.children,
+    type: props.type,
+    disabled: props.disabled
+  });
+}
+function lightenColor(hex, percent) {
+  const num = parseInt(hex.slice(1), 16);
+  const r = (num >> 16) + Math.round(255 * percent);
+  const g = (num >> 8 & 255) + Math.round(255 * percent);
+  const b2 = (num & 255) + Math.round(255 * percent);
+  const newR = Math.min(255, Math.max(0, r));
+  const newG = Math.min(255, Math.max(0, g));
+  const newB = Math.min(255, Math.max(0, b2));
+  const newHex = newR << 16 | newG << 8 | newB;
+  return `#${newHex.toString(16).padStart(6, "0")}`;
+}
+
 // src/jsx-runtime/render.ts
 function renderJsx(tag, props, _key) {
   if (!tag) {
@@ -1892,6 +2323,7 @@ var jsxs = renderJsx;
 var jsxDEV = renderJsx;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  Button,
   a,
   abbr,
   addModifier,
@@ -1930,6 +2362,7 @@ var jsxDEV = renderJsx;
   dl,
   dt,
   element,
+  elements,
   em,
   embed,
   fieldset,

@@ -25,6 +25,8 @@
   "scripts": {
     "build": "tsup",
     "build:watch": "tsup --watch",
+    "build:example": "tsup --config example/tsup.config.ts example/index.tsx",
+    "build:bundleAndExample": "npm run build && npm run build:example",
     "test": "jest",
     "test:coverage": "jest --coverage --collect-coverage",
     "test:badges": "coverage-badges",
@@ -51,7 +53,7 @@
     "./dist": "./dist"
   },
   "dependencies": {
-    "@tioniq/eventiq": "^1.1.0"
+    "@tioniq/eventiq": "^1.1.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.1",

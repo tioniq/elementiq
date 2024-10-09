@@ -1,5 +1,5 @@
-import {ElementOptions, ElementValue} from "@/types/element"
-import {element} from "@/element"
+import {ElementOptions, ElementValue} from "@/types/element.ts"
+import {element} from "@/element/index.ts"
 
 export function text(text: string): Text {
   return document.createTextNode(text)

@@ -1,7 +1,7 @@
-import {ClassNameMap, Style, StyleDeclaration} from "./types";
+import {ClassNameMap, Style, StyleDeclaration} from "./types.js";
 import {DisposableAction, IDisposable, IDisposablesContainer} from "@tioniq/disposiq";
 
-export * from "./types"
+export * from "./types.js"
 
 const _addedStyles: HTMLStyleElement[] = []
 

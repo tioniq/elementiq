@@ -1,5 +1,5 @@
 import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
-import { Variable, VarOrVal } from '@tioniq/eventiq';
+import { Variable, Var, VarOrVal } from '@tioniq/eventiq';
 
 type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? A : B;
 type WritableKeys<T> = {
@@ -37,9 +37,9 @@ type ObjectValuesVariableOrValue<Type extends Record<string, any>> = {
     [P in keyof Type]: Type[P] | Variable<Type[P]> | Variable<NonUndefined<Type[P]>>;
 };
 type ElementChild = Node | string | undefined | null | boolean;
-type ElementChildren = Array<VarOrVal<ElementChild>> | ElementChild;
+type ElementChildren = ElementChild | Var<ElementChildren | ElementChildren[]> | VarOrVal<ElementChildren>[];
 type ElementDataset = Record<string, string>;
-type ElementStyle = Partial<ObjectWritableProps<CSSStyleDeclaration>>;
+type ElementStyle = ObjectValuesVariableOrValue<Partial<ObjectWritableProps<CSSStyleDeclaration>>>;
 type EventKeywordsArray = [
     "animation",
     "transition",
@@ -99,7 +99,7 @@ type ElementProps<T extends HTMLElement = HTMLElement> = {
     onMount?: (this: T) => DisposableLike | void;
 };
 type ElementController<T extends HTMLElement = HTMLElement> = {
-    [P in keyof T as (T[P] extends Function ? P : never)]?: T[P];
+    [P in keyof T as (T[P] extends Function ? P : never)]: T[P];
 };
 type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
     parent?: ParentNode;
@@ -231,10 +231,7 @@ declare function td(options?: ElementOptions<HTMLTableCellElement>): ElementValu
 declare function template(options?: ElementOptions<HTMLTemplateElement>): ElementValue<HTMLTemplateElement>;
 declare function textarea(options?: ElementOptions<HTMLTextAreaElement>): ElementValue<HTMLTextAreaElement>;
 declare function tfoot(options?: ElementOptions<HTMLTableSectionElement>): ElementValue<HTMLTableSectionElement>;
-/**
- * @deprecated
- */
-declare function th(options?: ElementOptions<HTMLTableHeaderCellElement>): ElementValue<HTMLTableHeaderCellElement>;
+declare function th(options?: ElementOptions<HTMLTableCellElement>): ElementValue<HTMLTableCellElement>;
 declare function thead(options?: ElementOptions<HTMLTableSectionElement>): ElementValue<HTMLTableSectionElement>;
 declare function time(options?: ElementOptions<HTMLTimeElement>): ElementValue<HTMLTimeElement>;
 declare function title(options?: ElementOptions<HTMLTitleElement>): ElementValue<HTMLTitleElement>;
@@ -245,6 +242,130 @@ declare function ul(options?: ElementOptions<HTMLUListElement>): ElementValue<HT
 declare function var_(options?: ElementOptions<HTMLElement>): ElementValue<HTMLElement>;
 declare function video(options?: ElementOptions<HTMLVideoElement>): ElementValue<HTMLVideoElement>;
 declare function wbr(options?: ElementOptions<HTMLElement>): ElementValue<HTMLElement>;
+declare const elements: {
+    rootElement: {
+        html: typeof html;
+    };
+    metadataAndScripting: {
+        head: typeof head;
+        title: typeof title;
+        meta: typeof meta;
+        base: typeof base;
+        link: typeof link;
+        style: typeof style;
+        noscript: typeof noscript;
+        script: typeof script;
+    };
+    embeddingContent: {
+        img: typeof img;
+        area: typeof area;
+        map: typeof map;
+        embed: typeof embed;
+        object: typeof object;
+        source: typeof source;
+        iframe: typeof iframe;
+        canvas: typeof canvas;
+        track: typeof track;
+        audio: typeof audio;
+        video: typeof video;
+    };
+    textLevelSemantics: {
+        span: typeof span;
+        a: typeof a;
+        rt: typeof rt;
+        dfn: typeof dfn;
+        em: typeof em;
+        i: typeof i;
+        small: typeof small;
+        ins: typeof ins;
+        s: typeof s;
+        rp: typeof rp;
+        abbr: typeof abbr;
+        time: typeof time;
+        b: typeof b;
+        strong: typeof strong;
+        del: typeof del;
+        kbd: typeof kbd;
+        q: typeof q;
+        var_: typeof var_;
+        sub: typeof sub;
+        mark: typeof mark;
+        bdi: typeof bdi;
+        wbr: typeof wbr;
+        cite: typeof cite;
+        samp: typeof samp;
+        sup: typeof sup;
+        ruby: typeof ruby;
+        bdo: typeof bdo;
+        code: typeof code;
+    };
+    groupingContent: {
+        div: typeof div;
+        pre: typeof pre;
+        br: typeof br;
+        p: typeof p;
+        blockquote: typeof blockquote;
+        hr: typeof hr;
+        ol: typeof ol;
+        dl: typeof dl;
+        figcaption: typeof figcaption;
+        ul: typeof ul;
+        dt: typeof dt;
+        figure: typeof figure;
+        li: typeof li;
+        dd: typeof dd;
+    };
+    forms: {
+        form: typeof form;
+        fieldset: typeof fieldset;
+        meter: typeof meter;
+        select: typeof select;
+        legend: typeof legend;
+        optgroup: typeof optgroup;
+        label: typeof label;
+        option: typeof option;
+        datalist: typeof datalist;
+        input: typeof input;
+        output: typeof output;
+        textarea: typeof textarea;
+        button: typeof button;
+        progress: typeof progress;
+    };
+    documentSections: {
+        body: typeof body;
+        h1: typeof h1;
+        section: typeof section;
+        aside: typeof aside;
+        h2: typeof h2;
+        header: typeof header;
+        address: typeof address;
+        h3: typeof h3;
+        nav: typeof nav;
+        h4: typeof h4;
+        article: typeof article;
+        h5: typeof h5;
+        footer: typeof footer;
+        h6: typeof h6;
+        hgroup: typeof hgroup;
+    };
+    tabularData: {
+        table: typeof table;
+        col: typeof col;
+        tbody: typeof tbody;
+        colgroup: typeof colgroup;
+        tr: typeof tr;
+        caption: typeof caption;
+        td: typeof td;
+        thead: typeof thead;
+        th: typeof th;
+        tfoot: typeof tfoot;
+    };
+    interactiveElements: {
+        menu: typeof menu;
+        summary: typeof summary;
+        details: typeof details;
+    };
+};
 
 declare function createController<T extends object>(): T;
 declare function useController<T>(controller: T, handler: T): void;
@@ -262,6 +383,51 @@ declare function addRawStyle(rawCss: string): IDisposable;
 declare function addStyles(styles: Style[]): IDisposable;
 declare function makeClassStyles<ClassKey extends string = string>(styles: Record<ClassKey, StyleDeclaration>, disposable?: IDisposablesContainer): ClassNameMap<ClassKey>;
 declare function removeAllGeneratedStyles(): void;
+
+declare function Button(props: {
+    controller?: Button.Controller;
+    variant?: VarOrVal<keyof Button.Variant>;
+    size?: VarOrVal<keyof Button.Size>;
+    appearance?: VarOrVal<keyof Button.Appearance>;
+    children?: VarOrVal<ElementChildren>;
+    onClick?: VarOrVal<(event: MouseEvent) => void>;
+    className?: VarOrVal<string | undefined>;
+    style?: VarOrVal<ElementStyle | undefined>;
+    type?: VarOrVal<HTMLButtonElement["type"]>;
+    disabled?: VarOrVal<boolean>;
+}): HTMLButtonElement;
+declare namespace Button {
+    interface Controller {
+        click(): void;
+        focus(): void;
+    }
+    interface Variant {
+        normal: true;
+        primary: true;
+        secondary: true;
+        success: true;
+        error: true;
+        warning: true;
+        info: true;
+    }
+    interface Size {
+        normal: true;
+        small: true;
+        large: true;
+    }
+    interface Theme {
+        system: true;
+        dark: true;
+        light: true;
+    }
+    interface Appearance {
+        normal: true;
+        solid: true;
+        outline: true;
+        link: true;
+        ghost: true;
+    }
+}
 
 declare namespace JSX {
     type ElementType = keyof IntrinsicElements | FunctionComponent | ClassComponent;
@@ -290,4 +456,4 @@ declare const jsxDEV: typeof renderJsx;
 declare function renderJsx<TProps extends object>(func: (props?: TProps) => JSX.Element, props: TProps, _key?: string): JSX.Element;
 declare function renderJsx<K extends keyof HTMLElementTagNameMap>(tag: K, props: ElementOptions<HTMLElementTagNameMap[K]>, _key?: string): JSX.Element;
 
-export { type ClassComponent, type ClassNameMap, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, useFunctionController, var_, video, wbr };
+export { Button, type ClassComponent, type ClassNameMap, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, useFunctionController, var_, video, wbr };

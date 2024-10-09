@@ -1,5 +1,5 @@
-import {renderJsx} from "./render"
-import {ClassComponent, ElementOptions, ElementValue, FunctionComponent} from "../index";
+import {renderJsx} from "./render.ts"
+import {ClassComponent, ElementOptions, ElementValue, FunctionComponent} from "../index.ts";
 
 export namespace JSX {
   export type ElementType =

@@ -1,5 +1,5 @@
-import {span, element, ElementOptions} from "../index";
-import {JSX} from "./index";
+import {span, element, ElementOptions} from "../index.ts";
+import {JSX} from "./index.ts";
 
 export function renderJsx<TProps extends object>(func: (props?: TProps) => JSX.Element, props: TProps, _key?: string): JSX.Element
 

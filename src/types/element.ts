@@ -1,7 +1,7 @@
-import {ObjectWritableProps, WritableKeys} from "./object"
-import {AttachedToDOMEvent, DetachedFromDOMEvent} from "@/lifecycle"
-import {DisposableLike} from "@tioniq/disposiq"
-import {Variable, VarOrVal} from "@tioniq/eventiq"
+import { ObjectWritableProps, WritableKeys } from "./object.js"
+import { AttachedToDOMEvent, DetachedFromDOMEvent } from "@/lifecycle/index.ts"
+import { DisposableLike } from "@tioniq/disposiq"
+import { Var, Variable, VarOrVal } from "@tioniq/eventiq"
 
 interface MissingAttributes {
   ariaControls?: string | null
@@ -17,11 +17,11 @@ export type ObjectValuesVariableOrValue<Type extends Record<string, any>> = {
 
 export type ElementChild = Node | string | undefined | null | boolean
 
-export type ElementChildren = Array<VarOrVal<ElementChild>> | ElementChild
+export type ElementChildren = ElementChild | Var<ElementChildren | ElementChildren[]> | VarOrVal<ElementChildren>[]
 
 export type ElementDataset = Record<string, string>
 
-export type ElementStyle = Partial<ObjectWritableProps<CSSStyleDeclaration>>
+export type ElementStyle = ObjectValuesVariableOrValue<Partial<ObjectWritableProps<CSSStyleDeclaration>>>
 
 type EventKeywordsArray = ["animation", "transition", "ended", "playing", "seeking", "waiting", "suspend", "invalid",
   "context", "update", "click", "cancel", "end", "toggle", "start", "pointer", "input", "transition", "change", "up",
@@ -87,7 +87,7 @@ export type ElementProps<T extends HTMLElement = HTMLElement> = {
 }
 
 export type ElementController<T extends HTMLElement = HTMLElement> = {
-  [P in keyof T as (T[P] extends Function ? P : never)]?: T[P]
+  [P in keyof T as (T[P] extends Function ? P : never)]: T[P]
 }
 
 export type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
