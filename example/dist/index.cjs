@@ -1258,6 +1258,61 @@ var ConstantVariable = class extends Variable {
     return emptyDisposable;
   }
 };
+var DelegateVariable = class extends CompoundVariable {
+  constructor(sourceOrDefaultValue) {
+    super(sourceOrDefaultValue instanceof Variable ? null : sourceOrDefaultValue != void 0 ? sourceOrDefaultValue : null);
+    this._sourceSubscription = new DisposableContainer();
+    if (sourceOrDefaultValue instanceof Variable) {
+      this._source = sourceOrDefaultValue;
+    } else {
+      this._source = null;
+    }
+  }
+  /**
+   * Sets the source variable. The source variable will be used to get the value for the delegate variable
+   * @param source the source variable or null to remove the source
+   * @returns a disposable that will remove the source when disposed
+   */
+  setSource(source) {
+    if (!source) {
+      if (this._source) {
+        this.value = this._source.value;
+        this._source = null;
+      }
+      this._sourceSubscription.disposeCurrent();
+      return emptyDisposable;
+    }
+    this._source = source;
+    this._sourceSubscription.disposeCurrent();
+    if (this.active) {
+      this._sourceSubscription.set(source.subscribeSilent((v) => this.setValueForce(v)));
+      this.value = source.value;
+    }
+    return new DisposableAction(() => {
+      if (this._source !== source) {
+        return;
+      }
+      this.setSource(null);
+    });
+  }
+  activate() {
+    if (this._source === null) {
+      return;
+    }
+    this._sourceSubscription.disposeCurrent();
+    this._sourceSubscription.set(this._source.subscribeSilent((v) => this.setValueForce(v)));
+    this.value = this._source.value;
+  }
+  deactivate() {
+    if (this._source === null) {
+      return;
+    }
+    this._sourceSubscription.disposeCurrent();
+  }
+  getExactValue() {
+    return this._source !== null ? this._source.value : super.getExactValue();
+  }
+};
 var FuncVariable = class extends CompoundVariable {
   constructor(activate, exactValue) {
     super(null);
@@ -1709,8 +1764,6 @@ var ThrottledVariable = class extends CompoundVariable {
     }));
   }
 };
-var noop2 = Object.freeze(function() {
-});
 var EventObserver = class {
 };
 var EventDispatcher = class extends EventObserver {
@@ -1838,6 +1891,9 @@ function createVar(initialValue) {
 function createConst(value) {
   return new ConstantVariable(value);
 }
+function createDelegate(sourceOrDefaultValue) {
+  return new DelegateVariable(sourceOrDefaultValue);
+}
 function combine(...vars) {
   if (vars.length === 0) {
     throw new Error("At least one variable must be provided");
@@ -1853,6 +1909,8 @@ function createDelayDispatcher(delay) {
     return new DisposableAction(() => clearTimeout(timeout));
   });
 }
+var noop2 = Object.freeze(function() {
+});
 Variable.prototype.subscribeDisposable = function(callback) {
   const container = new DisposableContainer();
   const subscription = this.subscribe((v) => {
@@ -3056,6 +3114,188 @@ function insertAfter(node, after) {
 function createEmptyNode() {
   return document.createTextNode("");
 }
+var setContextValueSymbol = Symbol("setContextValue");
+var getContextSymbol = Symbol("getContextProvider");
+function getContext(value) {
+  return value[getContextSymbol];
+}
+function setContextValue(contextValue, value) {
+  contextValue[setContextValueSymbol](value);
+}
+function useContext(context, defaultValue) {
+  var _a;
+  const pro = context;
+  const type = typeof pro.__key;
+  if (type !== "string") {
+    throw new Error("Invalid context object");
+  }
+  const initialValue = (_a = defaultValue != null ? defaultValue : pro.__defaultValue) != null ? _a : null;
+  const val = {};
+  const dataMap = /* @__PURE__ */ new Map();
+  return new Proxy(val, {
+    get(_, key) {
+      if (typeof key !== "string") {
+        if (key === getContextSymbol) {
+          return context;
+        }
+        if (key === setContextValueSymbol) {
+          return function(newValue) {
+            if (!newValue) {
+              for (let dataMapElement of dataMap) {
+                dataMapElement[1].setSource(null);
+              }
+              return true;
+            }
+            for (let key2 in newValue) {
+              let value2 = dataMap.get(key2);
+              if (!value2) {
+                value2 = createDelegate(initialValue ? initialValue[key2] : null);
+                dataMap.set(key2, value2);
+              }
+              const v = newValue[key2];
+              if (isVariableOf(v)) {
+                value2.setSource(v);
+              } else {
+                value2.setSource(createConst(v));
+              }
+            }
+            return true;
+          };
+        }
+        return void 0;
+      }
+      let value = dataMap.get(key);
+      if (value) {
+        return value;
+      }
+      if (!initialValue) {
+        value = createDelegate(null);
+        dataMap.set(key, value);
+        return value;
+      }
+      value = createDelegate(initialValue[key]);
+      dataMap.set(key, value);
+      return value;
+    }
+  });
+}
+function randomUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : r & 3 | 8;
+    return v.toString(16);
+  });
+}
+function createContext(key, defaultValue) {
+  if (!key) {
+    throw new Error("Context key cannot be empty");
+  }
+  const id = randomUUID();
+  const result = {
+    __defaultValue: defaultValue,
+    get __key() {
+      return key;
+    },
+    get __id() {
+      return id;
+    }
+  };
+  return result;
+}
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+var providers = /* @__PURE__ */ new Map();
+function applyContext(element2, lifecycle, contextValue) {
+  if (!contextValue) {
+    return;
+  }
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable2;
+    }
+    const context = getContext(contextValue);
+    const provider = findContextProvider(element2, context);
+    if (!provider) {
+      return emptyDisposable2;
+    }
+    setContextValue(contextValue, provider.value);
+    return emptyDisposable2;
+  });
+}
+function findContextProvider(element2, context) {
+  if (!context) {
+    return null;
+  }
+  let el = element2;
+  const keyToFind = getDataKey(context.__key);
+  while (el != null) {
+    const providerId = el.dataset[keyToFind];
+    if (providerId) {
+      const result = providers.get(providerId);
+      if (result) {
+        return result;
+      }
+      console.warn("Invalid context provider id");
+    }
+    el = el.parentElement;
+  }
+  console.error("No context provider found");
+  return null;
+}
+function ContextProvider(props) {
+  const provider = createProvider(props.context, props.value);
+  if (!props.children) {
+    return null;
+  }
+  applyContextProvider(props.children, provider);
+  return props.children;
+}
+function applyContextProvider(children, provider) {
+  if (!provider) {
+    return;
+  }
+  if (children instanceof HTMLElement) {
+    children.dataset[provider.dataKey] = provider.id;
+    return;
+  }
+  if (isVariableOf(children)) {
+    children.subscribe((value) => {
+      applyContextProvider(value, provider);
+    });
+    return;
+  }
+  if (Array.isArray(children)) {
+    for (let child of children) {
+      applyContextProvider(child, provider);
+    }
+    return;
+  }
+  console.warn("Invalid children type");
+}
+function createProvider(context, value) {
+  const key = context.__key;
+  const id = context.__id;
+  if (typeof key !== "string") {
+    throw new Error("Invalid context object");
+  }
+  if (typeof id !== "string") {
+    throw new Error("Invalid context object");
+  }
+  let dataKey = getDataKey(key);
+  const provider = {
+    context,
+    value,
+    key,
+    id,
+    dataKey
+  };
+  providers.set(id, provider);
+  return provider;
+}
+function getDataKey(key) {
+  return "elCtx" + capitalize(key.replace("-", ""));
+}
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
 var emptyStringArray = [];
@@ -3099,6 +3339,10 @@ function applyOptions(element2, elementOptions, lifecycle) {
     }
     if (key === "controller") {
       applyController(element2, value);
+      continue;
+    }
+    if (key === "context") {
+      applyContext(element2, lifecycle, value);
       continue;
     }
     if (key.startsWith("on")) {
@@ -3340,6 +3584,28 @@ function listenObjectKVChanges(variable, handler) {
   return subscription;
 }
 runMutationObserver();
+var theme = new MutableVariable("dark");
+function getThemeStyle(forTheme) {
+  forTheme = forTheme != null ? forTheme : theme;
+  return {
+    normalColor: new MutableVariable("#232323"),
+    primaryColor: new MutableVariable("#227093"),
+    secondaryColor: new MutableVariable("#706fd3"),
+    successColor: new MutableVariable("#33d9b2"),
+    errorColor: new MutableVariable("#ff5252"),
+    warningColor: new MutableVariable("#ffda79"),
+    infoColor: new MutableVariable("#34ace0"),
+    textColor: forTheme.map((t) => t === "dark" ? "#ffffff" : "#000000")
+  };
+}
+function getThemeStyleFromContext(context) {
+  return getThemeStyle(context.theme);
+}
+var themeStyle = getThemeStyle(theme);
+function createThemeContext() {
+  return createContext("theme");
+}
+var ThemeContext = createThemeContext();
 function button(options) {
   return element("button", options);
 }
@@ -3517,20 +3783,6 @@ var buttonStyles = makeClassStyles({
     backgroundColor: "#282828"
   }
 });
-var theme = new MutableVariable("dark");
-function createThemeStyle(theme2) {
-  return {
-    normalColor: new MutableVariable("#232323"),
-    primaryColor: new MutableVariable("#227093"),
-    secondaryColor: new MutableVariable("#706fd3"),
-    successColor: new MutableVariable("#33d9b2"),
-    errorColor: new MutableVariable("#ff5252"),
-    warningColor: new MutableVariable("#ffda79"),
-    infoColor: new MutableVariable("#34ace0"),
-    textColor: theme2.map((t) => t === "dark" ? "#ffffff" : "#000000")
-  };
-}
-var themeStyle = createThemeStyle(theme);
 function Button(props) {
   let controller = props.controller == void 0 ? void 0 : createController();
   if (controller) {
@@ -3543,6 +3795,8 @@ function Button(props) {
       }
     });
   }
+  const context = useContext(ThemeContext);
+  const themeStyle2 = getThemeStyleFromContext(context);
   const variant = toDefinedVariable(props.variant, "normal");
   const appearance = toDefinedVariable(props.appearance, "normal");
   const size = toDefinedVariable(props.size, "normal");
@@ -3554,7 +3808,7 @@ function Button(props) {
       return (_a = buttonStyles[`button-size-${s2}`]) != null ? _a : "";
     })
   );
-  const variantColor = variant.switchMap((v) => themeStyle[`${v}Color`]);
+  const variantColor = variant.switchMap((v) => themeStyle2[`${v}Color`]);
   const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
   const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : createConst("transparent"));
   const borderColor = variantColor;
@@ -3567,7 +3821,7 @@ function Button(props) {
       case "outline":
         return variantColor;
       default:
-        return themeStyle.textColor;
+        return themeStyle2.textColor;
     }
   });
   const textDecoration = appearance.map((a2) => a2 === "link" ? "underline" : "none");
@@ -3587,7 +3841,8 @@ function Button(props) {
     onClick: props.onClick,
     children: props.children,
     type: props.type,
-    disabled: props.disabled
+    disabled: props.disabled,
+    context
   });
 }
 function lightenColor(hex, percent) {
@@ -3635,13 +3890,14 @@ function AnotherView() {
   return /* @__PURE__ */ jsx("span", { children: "Hello, you tapped:" });
 }
 function View() {
+  const theme2 = createVar("dark");
   const count = createVar(0);
   const variants = ["normal", "primary", "secondary", "success", "error", "warning", "info"];
   const appearances = ["normal", "solid", "outline", "link", "ghost"];
   const variant = createVar("normal");
   const appearance = createVar("normal");
   const dynamicElements = createVar([]);
-  return /* @__PURE__ */ jsxs("div", { children: [
+  return /* @__PURE__ */ jsx(ContextProvider, { context: ThemeContext, value: { theme: theme2 }, children: /* @__PURE__ */ jsxs("div", { children: [
     /* @__PURE__ */ jsx(AnotherView, {}),
     /* @__PURE__ */ jsxs("span", { children: [
       count.map((c) => c % 10 === 0 ? /* @__PURE__ */ jsx("span", { children: "Wow!" }) : c.toString()),
@@ -3672,8 +3928,11 @@ function View() {
       ] })];
       console.info("Dynamic elements", dynamicElements.value);
       console.log("Dynamic elements change time:", performance.now() - startTime, "ms");
-    }, children: "Add dynamic element" })
-  ] });
+    }, children: "Add dynamic element" }),
+    /* @__PURE__ */ jsx(Button, { onClick: () => {
+      theme2.value = theme2.value === "light" ? "dark" : "light";
+    }, children: "Change theme" })
+  ] }) });
 }
 window.onload = () => {
   let startTime = performance.now();

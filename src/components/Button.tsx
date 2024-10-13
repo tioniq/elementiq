@@ -4,12 +4,13 @@ import { combine, createConst, Var, VarOrVal } from "@tioniq/eventiq";
 import { toDefinedVariable, toVariable } from "@/variable/variable.js";
 import { button } from "@/dom/dom-elements.js";
 import { buttonStyles } from "@/components/button-styles.js";
-import { themeStyle } from "@/components/theme-style.js";
+import { getThemeStyleFromContext, ThemeContext } from "@/components/theme-style.js";
+import { useContext } from "@/context/context.js";
 
 export function Button(props: Button.Props) {
   let controller: ElementController<HTMLButtonElement> | undefined = props.controller == undefined
     ? undefined
-    : createController<ElementController<HTMLButtonElement>>();
+    : createController<ElementController<HTMLButtonElement>>()
   if (controller) {
     useController(props.controller, {
       click() {
@@ -20,6 +21,9 @@ export function Button(props: Button.Props) {
       }
     })
   }
+  const context = useContext(ThemeContext)
+  const themeStyle = getThemeStyleFromContext(context)
+
   const variant = toDefinedVariable(props.variant, "normal")
   const appearance = toDefinedVariable(props.appearance, "normal")
   const size = toDefinedVariable(props.size, "normal")
@@ -63,7 +67,8 @@ export function Button(props: Button.Props) {
     onClick: props.onClick,
     children: props.children,
     type: props.type,
-    disabled: props.disabled
+    disabled: props.disabled,
+    context: context
   })
 }
 

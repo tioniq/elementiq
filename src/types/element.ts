@@ -2,6 +2,7 @@ import { ObjectWritableProps, WritableKeys } from "./object.js"
 import { AttachedToDOMEvent, DetachedFromDOMEvent } from "@/lifecycle/index.ts"
 import { DisposableLike } from "@tioniq/disposiq"
 import { Var, Variable, VarOrVal } from "@tioniq/eventiq"
+import { ContextValue } from "@/context/context.js";
 
 interface MissingAttributes {
   ariaControls?: string | null
@@ -93,6 +94,7 @@ export type ElementController<T extends HTMLElement = HTMLElement> = {
 export type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
   parent?: ParentNode
   controller?: ElementController<T>
+  context?: ContextValue<any>
 }
 
 export type StubElement = Symbol

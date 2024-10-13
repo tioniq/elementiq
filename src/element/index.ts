@@ -19,7 +19,8 @@ import {
 import { isVariableOf, LazyVariable, Var, VarOrVal } from "@tioniq/eventiq";
 import { applyModification } from "./modifier.ts";
 import { useController } from "@/controller/index.ts";
-import { applyChildren } from "@/element/children.js";
+import { applyChildren } from "@/element/children.ts";
+import { applyContext } from "@/element/context.ts";
 
 const propsKey = "_elemiqProps"
 const noProps = Object.freeze({})
@@ -72,6 +73,10 @@ function applyOptions<K extends keyof HTMLElementTagNameMap, E extends HTMLEleme
     }
     if (key === "controller") {
       applyController(element, value)
+      continue
+    }
+    if (key === "context") {
+      applyContext(element, lifecycle, value)
       continue
     }
     if (key.startsWith("on")) {

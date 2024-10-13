@@ -21,6 +21,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var src_exports = {};
 __export(src_exports, {
   Button: () => Button,
+  ContextProvider: () => ContextProvider,
+  ThemeContext: () => ThemeContext,
   a: () => a,
   abbr: () => abbr,
   addModifier: () => addModifier,
@@ -47,7 +49,9 @@ __export(src_exports, {
   code: () => code,
   col: () => col,
   colgroup: () => colgroup,
+  createContext: () => createContext,
   createController: () => createController,
+  createThemeContext: () => createThemeContext,
   data: () => data,
   datalist: () => datalist,
   dd: () => dd,
@@ -67,6 +71,8 @@ __export(src_exports, {
   figure: () => figure,
   footer: () => footer,
   form: () => form,
+  getThemeStyle: () => getThemeStyle,
+  getThemeStyleFromContext: () => getThemeStyleFromContext,
   h1: () => h1,
   h2: () => h2,
   h3: () => h3,
@@ -140,12 +146,15 @@ __export(src_exports, {
   tfoot: () => tfoot,
   th: () => th,
   thead: () => thead,
+  theme: () => theme,
+  themeStyle: () => themeStyle,
   time: () => time,
   title: () => title,
   tr: () => tr,
   track: () => track,
   u: () => u,
   ul: () => ul,
+  useContext: () => useContext,
   useController: () => useController,
   useFunctionController: () => useFunctionController,
   var_: () => var_,
@@ -986,7 +995,7 @@ var ExceptionHandlerManager = class {
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
 // src/element/index.ts
-var import_eventiq3 = require("@tioniq/eventiq");
+var import_eventiq5 = require("@tioniq/eventiq");
 
 // src/element/modifier.ts
 var modifiers = [];
@@ -1247,6 +1256,198 @@ function createEmptyNode() {
   return document.createTextNode("");
 }
 
+// src/element/context.ts
+var import_eventiq4 = require("@tioniq/eventiq");
+
+// src/context/context.ts
+var import_eventiq3 = require("@tioniq/eventiq");
+var setContextValueSymbol = Symbol("setContextValue");
+var getContextSymbol = Symbol("getContextProvider");
+function getContext(value) {
+  return value[getContextSymbol];
+}
+function setContextValue(contextValue, value) {
+  contextValue[setContextValueSymbol](value);
+}
+function useContext(context, defaultValue) {
+  var _a;
+  const pro = context;
+  const type = typeof pro.__key;
+  if (type !== "string") {
+    throw new Error("Invalid context object");
+  }
+  const initialValue = (_a = defaultValue != null ? defaultValue : pro.__defaultValue) != null ? _a : null;
+  const val = {};
+  const dataMap = /* @__PURE__ */ new Map();
+  return new Proxy(val, {
+    get(_, key) {
+      if (typeof key !== "string") {
+        if (key === getContextSymbol) {
+          return context;
+        }
+        if (key === setContextValueSymbol) {
+          return function(newValue) {
+            if (!newValue) {
+              for (let dataMapElement of dataMap) {
+                dataMapElement[1].setSource(null);
+              }
+              return true;
+            }
+            for (let key2 in newValue) {
+              let value2 = dataMap.get(key2);
+              if (!value2) {
+                value2 = (0, import_eventiq3.createDelegate)(initialValue ? initialValue[key2] : null);
+                dataMap.set(key2, value2);
+              }
+              const v = newValue[key2];
+              if ((0, import_eventiq3.isVariableOf)(v)) {
+                value2.setSource(v);
+              } else {
+                value2.setSource((0, import_eventiq3.createConstVar)(v));
+              }
+            }
+            return true;
+          };
+        }
+        return void 0;
+      }
+      let value = dataMap.get(key);
+      if (value) {
+        return value;
+      }
+      if (!initialValue) {
+        value = (0, import_eventiq3.createDelegate)(null);
+        dataMap.set(key, value);
+        return value;
+      }
+      value = (0, import_eventiq3.createDelegate)(initialValue[key]);
+      dataMap.set(key, value);
+      return value;
+    }
+  });
+}
+function randomUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : r & 3 | 8;
+    return v.toString(16);
+  });
+}
+function createContext(key, defaultValue) {
+  if (!key) {
+    throw new Error("Context key cannot be empty");
+  }
+  const id = randomUUID();
+  const result = {
+    __defaultValue: defaultValue,
+    get __key() {
+      return key;
+    },
+    get __id() {
+      return id;
+    }
+  };
+  return result;
+}
+
+// src/utils/string-utils.ts
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// src/element/context.ts
+var providers = /* @__PURE__ */ new Map();
+function applyContext(element2, lifecycle, contextValue) {
+  if (!contextValue) {
+    return;
+  }
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable;
+    }
+    const context = getContext(contextValue);
+    const provider = findContextProvider(element2, context);
+    if (!provider) {
+      return emptyDisposable;
+    }
+    setContextValue(contextValue, provider.value);
+    return emptyDisposable;
+  });
+}
+function findContextProvider(element2, context) {
+  if (!context) {
+    return null;
+  }
+  let el = element2;
+  const keyToFind = getDataKey(context.__key);
+  while (el != null) {
+    const providerId = el.dataset[keyToFind];
+    if (providerId) {
+      const result = providers.get(providerId);
+      if (result) {
+        return result;
+      }
+      console.warn("Invalid context provider id");
+    }
+    el = el.parentElement;
+  }
+  console.error("No context provider found");
+  return null;
+}
+function ContextProvider(props) {
+  const provider = createProvider(props.context, props.value);
+  if (!props.children) {
+    return null;
+  }
+  applyContextProvider(props.children, provider);
+  return props.children;
+}
+function applyContextProvider(children, provider) {
+  if (!provider) {
+    return;
+  }
+  if (children instanceof HTMLElement) {
+    children.dataset[provider.dataKey] = provider.id;
+    return;
+  }
+  if ((0, import_eventiq4.isVariableOf)(children)) {
+    children.subscribe((value) => {
+      applyContextProvider(value, provider);
+    });
+    return;
+  }
+  if (Array.isArray(children)) {
+    for (let child of children) {
+      applyContextProvider(child, provider);
+    }
+    return;
+  }
+  console.warn("Invalid children type");
+}
+function createProvider(context, value) {
+  const key = context.__key;
+  const id = context.__id;
+  if (typeof key !== "string") {
+    throw new Error("Invalid context object");
+  }
+  if (typeof id !== "string") {
+    throw new Error("Invalid context object");
+  }
+  let dataKey = getDataKey(key);
+  const provider = {
+    context,
+    value,
+    key,
+    id,
+    dataKey
+  };
+  providers.set(id, provider);
+  return provider;
+}
+function getDataKey(key) {
+  return "elCtx" + capitalize(key.replace("-", ""));
+}
+
 // src/element/index.ts
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
@@ -1293,6 +1494,10 @@ function applyOptions(element2, elementOptions, lifecycle) {
       applyController(element2, value);
       continue;
     }
+    if (key === "context") {
+      applyContext(element2, lifecycle, value);
+      continue;
+    }
     if (key.startsWith("on")) {
       if (key === "onMount") {
         applyOnMount(element2, lifecycle, value);
@@ -1317,7 +1522,7 @@ function applyOptions(element2, elementOptions, lifecycle) {
   }
 }
 function createLifecycle(element2) {
-  return new import_eventiq3.LazyVariable((vary) => {
+  return new import_eventiq5.LazyVariable((vary) => {
     element2.dataset[domListenKey] = "t";
     const attachListener = function() {
       vary.value = true;
@@ -1338,7 +1543,7 @@ function applyClasses(element2, lifecycle, classes) {
   if (!classes) {
     return;
   }
-  if (!(0, import_eventiq3.isVariableOf)(classes)) {
+  if (!(0, import_eventiq5.isVariableOf)(classes)) {
     element2.classList.add(...classes.filter((c) => !!c));
     return;
   }
@@ -1381,7 +1586,7 @@ function applyStyle(element2, lifecycle, style2) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore();
-    if ((0, import_eventiq3.isVariableOf)(style2)) {
+    if ((0, import_eventiq5.isVariableOf)(style2)) {
       const dispoMapStore = new DisposableMapStore();
       disposables.add(dispoMapStore);
       disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
@@ -1394,7 +1599,7 @@ function applyStyle(element2, lifecycle, style2) {
         if (changesToAddOrModify !== null) {
           for (let key in changesToAddOrModify) {
             const value = changesToAddOrModify[key];
-            if ((0, import_eventiq3.isVariableOf)(value)) {
+            if ((0, import_eventiq5.isVariableOf)(value)) {
               dispoMapStore.set(key, value.subscribe((newValue) => {
                 if (newValue === void 0) {
                   element2.style.removeProperty(key);
@@ -1417,7 +1622,7 @@ function applyStyle(element2, lifecycle, style2) {
       let styleKey;
       for (styleKey in style2) {
         const value = style2[styleKey];
-        if ((0, import_eventiq3.isVariableOf)(value)) {
+        if ((0, import_eventiq5.isVariableOf)(value)) {
           disposables.add(value.subscribe((newValue) => {
             if (newValue === void 0) {
               element2.style.removeProperty(styleKey);
@@ -1441,7 +1646,7 @@ function applyDataset(element2, lifecycle, dataset) {
   if (!dataset) {
     return;
   }
-  if (!(0, import_eventiq3.isVariableOf)(dataset)) {
+  if (!(0, import_eventiq5.isVariableOf)(dataset)) {
     for (let key in dataset) {
       element2.dataset[key] = dataset[key];
     }
@@ -1467,7 +1672,7 @@ function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
     return;
   }
-  if (!(0, import_eventiq3.isVariableOf)(onMount)) {
+  if (!(0, import_eventiq5.isVariableOf)(onMount)) {
     lifecycle.subscribeDisposable((active) => {
       var _a;
       return active ? createDisposable((_a = onMount.call(element2)) != null ? _a : emptyDisposable) : emptyDisposable;
@@ -1483,7 +1688,7 @@ function applyProperty(element2, lifecycle, key, value) {
   if (value === void 0) {
     return;
   }
-  if (!(0, import_eventiq3.isVariableOf)(value)) {
+  if (!(0, import_eventiq5.isVariableOf)(value)) {
     element2[key] = value;
     return;
   }
@@ -1495,7 +1700,7 @@ function applyParent(element2, lifecycle, parent) {
   if (!parent) {
     return;
   }
-  if (!(0, import_eventiq3.isVariableOf)(parent)) {
+  if (!(0, import_eventiq5.isVariableOf)(parent)) {
     parent.appendChild(element2);
     return;
   }
@@ -1532,6 +1737,31 @@ function listenObjectKVChanges(variable, handler) {
   return subscription;
 }
 runMutationObserver();
+
+// src/components/theme-style.ts
+var import_eventiq6 = require("@tioniq/eventiq");
+var theme = new import_eventiq6.Vary("dark");
+function getThemeStyle(forTheme) {
+  forTheme = forTheme != null ? forTheme : theme;
+  return {
+    normalColor: new import_eventiq6.Vary("#232323"),
+    primaryColor: new import_eventiq6.Vary("#227093"),
+    secondaryColor: new import_eventiq6.Vary("#706fd3"),
+    successColor: new import_eventiq6.Vary("#33d9b2"),
+    errorColor: new import_eventiq6.Vary("#ff5252"),
+    warningColor: new import_eventiq6.Vary("#ffda79"),
+    infoColor: new import_eventiq6.Vary("#34ace0"),
+    textColor: forTheme.map((t) => t === "dark" ? "#ffffff" : "#000000")
+  };
+}
+function getThemeStyleFromContext(context) {
+  return getThemeStyle(context.theme);
+}
+var themeStyle = getThemeStyle(theme);
+function createThemeContext() {
+  return createContext("theme");
+}
+var ThemeContext = createThemeContext();
 
 // src/dom/dom-elements.ts
 function text(text2) {
@@ -2128,21 +2358,21 @@ function getFirstWord(str) {
 }
 
 // src/components/Button.tsx
-var import_eventiq6 = require("@tioniq/eventiq");
+var import_eventiq8 = require("@tioniq/eventiq");
 
 // src/variable/variable.ts
-var import_eventiq4 = require("@tioniq/eventiq");
+var import_eventiq7 = require("@tioniq/eventiq");
 function toVariable(value) {
-  if ((0, import_eventiq4.isVariableOf)(value)) {
+  if ((0, import_eventiq7.isVariableOf)(value)) {
     return value;
   }
-  return (0, import_eventiq4.createConst)(value != null ? value : null);
+  return (0, import_eventiq7.createConst)(value != null ? value : null);
 }
 function toDefinedVariable(value, defaultValue) {
-  if ((0, import_eventiq4.isVariableOf)(value)) {
+  if ((0, import_eventiq7.isVariableOf)(value)) {
     return value.map((v) => v != null ? v : defaultValue);
   }
-  return (0, import_eventiq4.createConst)(value != null ? value : defaultValue);
+  return (0, import_eventiq7.createConst)(value != null ? value : defaultValue);
 }
 
 // src/components/button-styles.ts
@@ -2200,23 +2430,6 @@ var buttonStyles = makeClassStyles({
   }
 });
 
-// src/components/theme-style.ts
-var import_eventiq5 = require("@tioniq/eventiq");
-var theme = new import_eventiq5.Vary("dark");
-function createThemeStyle(theme2) {
-  return {
-    normalColor: new import_eventiq5.Vary("#232323"),
-    primaryColor: new import_eventiq5.Vary("#227093"),
-    secondaryColor: new import_eventiq5.Vary("#706fd3"),
-    successColor: new import_eventiq5.Vary("#33d9b2"),
-    errorColor: new import_eventiq5.Vary("#ff5252"),
-    warningColor: new import_eventiq5.Vary("#ffda79"),
-    infoColor: new import_eventiq5.Vary("#34ace0"),
-    textColor: theme2.map((t) => t === "dark" ? "#ffffff" : "#000000")
-  };
-}
-var themeStyle = createThemeStyle(theme);
-
 // src/components/Button.tsx
 function Button(props) {
   let controller = props.controller == void 0 ? void 0 : createController();
@@ -2230,20 +2443,22 @@ function Button(props) {
       }
     });
   }
+  const context = useContext(ThemeContext);
+  const themeStyle2 = getThemeStyleFromContext(context);
   const variant = toDefinedVariable(props.variant, "normal");
   const appearance = toDefinedVariable(props.appearance, "normal");
   const size = toDefinedVariable(props.size, "normal");
-  const classes = (0, import_eventiq6.combine)(
-    (0, import_eventiq6.createConst)(buttonStyles.button),
+  const classes = (0, import_eventiq8.combine)(
+    (0, import_eventiq8.createConst)(buttonStyles.button),
     appearance.map((a2) => a2 === "ghost" ? buttonStyles.buttonGhost : ""),
     size.map((s2) => {
       var _a;
       return (_a = buttonStyles[`button-size-${s2}`]) != null ? _a : "";
     })
   );
-  const variantColor = variant.switchMap((v) => themeStyle[`${v}Color`]);
+  const variantColor = variant.switchMap((v) => themeStyle2[`${v}Color`]);
   const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
-  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : (0, import_eventiq6.createConst)("transparent"));
+  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : (0, import_eventiq8.createConst)("transparent"));
   const borderColor = variantColor;
   const textColor = appearance.switchMap((a2) => {
     switch (a2) {
@@ -2254,7 +2469,7 @@ function Button(props) {
       case "outline":
         return variantColor;
       default:
-        return themeStyle.textColor;
+        return themeStyle2.textColor;
     }
   });
   const textDecoration = appearance.map((a2) => a2 === "link" ? "underline" : "none");
@@ -2274,7 +2489,8 @@ function Button(props) {
     onClick: props.onClick,
     children: props.children,
     type: props.type,
-    disabled: props.disabled
+    disabled: props.disabled,
+    context
   });
 }
 function lightenColor(hex, percent) {
@@ -2324,6 +2540,8 @@ var jsxDEV = renderJsx;
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   Button,
+  ContextProvider,
+  ThemeContext,
   a,
   abbr,
   addModifier,
@@ -2350,7 +2568,9 @@ var jsxDEV = renderJsx;
   code,
   col,
   colgroup,
+  createContext,
   createController,
+  createThemeContext,
   data,
   datalist,
   dd,
@@ -2370,6 +2590,8 @@ var jsxDEV = renderJsx;
   figure,
   footer,
   form,
+  getThemeStyle,
+  getThemeStyleFromContext,
   h1,
   h2,
   h3,
@@ -2443,12 +2665,15 @@ var jsxDEV = renderJsx;
   tfoot,
   th,
   thead,
+  theme,
+  themeStyle,
   time,
   title,
   tr,
   track,
   u,
   ul,
+  useContext,
   useController,
   useFunctionController,
   var_,

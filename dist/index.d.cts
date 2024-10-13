@@ -1,5 +1,6 @@
 import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
-import { Variable, Var, VarOrVal } from '@tioniq/eventiq';
+import * as _tioniq_eventiq from '@tioniq/eventiq';
+import { Var, Variable, VarOrVal, Vary } from '@tioniq/eventiq';
 
 type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? A : B;
 type WritableKeys<T> = {
@@ -26,6 +27,14 @@ declare class AttachedToDOMEvent extends Event {
 declare class DetachedFromDOMEvent extends Event {
     constructor();
 }
+
+type ContextType = Record<string, any>;
+type Context<T extends ContextType> = {};
+type ContextValue<T extends ContextType> = {
+    [P in keyof T]: T[P] extends Var<unknown> ? T[P] : Var<T[P]>;
+};
+declare function useContext<T extends ContextType>(context: Context<T>, defaultValue?: T | null): ContextValue<T>;
+declare function createContext<T extends ContextType>(key: string, defaultValue?: T | null): Context<T>;
 
 interface MissingAttributes {
     ariaControls?: string | null;
@@ -104,6 +113,7 @@ type ElementController<T extends HTMLElement = HTMLElement> = {
 type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
     parent?: ParentNode;
     controller?: ElementController<T>;
+    context?: ContextValue<any>;
 };
 type StubElement = Symbol;
 type ElementValue<T extends HTMLElement = HTMLElement> = T;
@@ -121,6 +131,54 @@ declare global {
     }
 }
 declare function element<K extends keyof HTMLElementTagNameMap>(tag: K, elementOptions?: ElementOptions<HTMLElementTagNameMap[K]>): ElementValue<HTMLElementTagNameMap[K]>;
+
+declare function ContextProvider<T extends ContextType>(props: {
+    context: Context<T>;
+    value: T;
+    children: ElementChildren;
+}): string | true | Node | Var<ElementChildren | ElementChildren[]> | _tioniq_eventiq.VarOrVal<ElementChildren>[] | null;
+
+declare const theme: Var<Exclude<keyof Theme, "system">>;
+interface Theme {
+    dark: true;
+    light: true;
+    system: true;
+}
+declare function getThemeStyle(forTheme?: Var<keyof Theme>): {
+    normalColor: Vary<string>;
+    primaryColor: Vary<string>;
+    secondaryColor: Vary<string>;
+    successColor: Vary<string>;
+    errorColor: Vary<string>;
+    warningColor: Vary<string>;
+    infoColor: Vary<string>;
+    textColor: Var<"#ffffff" | "#000000">;
+};
+declare function getThemeStyleFromContext(context: ContextValue<ThemeContextValue>): {
+    normalColor: Vary<string>;
+    primaryColor: Vary<string>;
+    secondaryColor: Vary<string>;
+    successColor: Vary<string>;
+    errorColor: Vary<string>;
+    warningColor: Vary<string>;
+    infoColor: Vary<string>;
+    textColor: Var<"#ffffff" | "#000000">;
+};
+declare const themeStyle: {
+    normalColor: Vary<string>;
+    primaryColor: Vary<string>;
+    secondaryColor: Vary<string>;
+    successColor: Vary<string>;
+    errorColor: Vary<string>;
+    warningColor: Vary<string>;
+    infoColor: Vary<string>;
+    textColor: Var<"#ffffff" | "#000000">;
+};
+interface ThemeContextValue {
+    theme: Var<keyof Theme>;
+}
+declare function createThemeContext(): Context<ThemeContextValue>;
+declare const ThemeContext: Context<ThemeContextValue>;
 
 interface Modifier {
     (element: HTMLElement, elementOptions?: ElementOptions): void;
@@ -384,19 +442,20 @@ declare function addStyles(styles: Style[]): IDisposable;
 declare function makeClassStyles<ClassKey extends string = string>(styles: Record<ClassKey, StyleDeclaration>, disposable?: IDisposablesContainer): ClassNameMap<ClassKey>;
 declare function removeAllGeneratedStyles(): void;
 
-declare function Button(props: {
-    controller?: Button.Controller;
-    variant?: VarOrVal<keyof Button.Variant>;
-    size?: VarOrVal<keyof Button.Size>;
-    appearance?: VarOrVal<keyof Button.Appearance>;
-    children?: VarOrVal<ElementChildren>;
-    onClick?: VarOrVal<(event: MouseEvent) => void>;
-    className?: VarOrVal<string | undefined>;
-    style?: VarOrVal<ElementStyle | undefined>;
-    type?: VarOrVal<HTMLButtonElement["type"]>;
-    disabled?: VarOrVal<boolean>;
-}): HTMLButtonElement;
+declare function Button(props: Button.Props): HTMLButtonElement;
 declare namespace Button {
+    interface Props {
+        controller?: Button.Controller;
+        variant?: VarOrVal<keyof Button.Variant>;
+        size?: VarOrVal<keyof Button.Size>;
+        appearance?: VarOrVal<keyof Button.Appearance>;
+        children?: VarOrVal<ElementChildren>;
+        onClick?: VarOrVal<(event: MouseEvent) => void>;
+        className?: VarOrVal<string | undefined>;
+        style?: VarOrVal<ElementStyle | undefined>;
+        type?: VarOrVal<HTMLButtonElement["type"]>;
+        disabled?: VarOrVal<boolean>;
+    }
     interface Controller {
         click(): void;
         focus(): void;
@@ -456,4 +515,4 @@ declare const jsxDEV: typeof renderJsx;
 declare function renderJsx<TProps extends object>(func: (props?: TProps) => JSX.Element, props: TProps, _key?: string): JSX.Element;
 declare function renderJsx<K extends keyof HTMLElementTagNameMap>(tag: K, props: ElementOptions<HTMLElementTagNameMap[K]>, _key?: string): JSX.Element;
 
-export { Button, type ClassComponent, type ClassNameMap, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createController, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, time, title, tr, track, u, ul, useController, useFunctionController, var_, video, wbr };
+export { Button, type ClassComponent, type ClassNameMap, type Context, ContextProvider, type ContextType, type ContextValue, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type Theme, ThemeContext, type ThemeContextValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createContext, createController, createThemeContext, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, getThemeStyle, getThemeStyleFromContext, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, theme, themeStyle, time, title, tr, track, u, ul, useContext, useController, useFunctionController, var_, video, wbr };

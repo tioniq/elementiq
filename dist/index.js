@@ -830,7 +830,7 @@ var ExceptionHandlerManager = class {
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
 // src/element/index.ts
-import { isVariableOf as isVariableOf2, LazyVariable } from "@tioniq/eventiq";
+import { isVariableOf as isVariableOf4, LazyVariable } from "@tioniq/eventiq";
 
 // src/element/modifier.ts
 var modifiers = [];
@@ -1091,6 +1091,198 @@ function createEmptyNode() {
   return document.createTextNode("");
 }
 
+// src/element/context.ts
+import { isVariableOf as isVariableOf3 } from "@tioniq/eventiq";
+
+// src/context/context.ts
+import { createConstVar, createDelegate, isVariableOf as isVariableOf2 } from "@tioniq/eventiq";
+var setContextValueSymbol = Symbol("setContextValue");
+var getContextSymbol = Symbol("getContextProvider");
+function getContext(value) {
+  return value[getContextSymbol];
+}
+function setContextValue(contextValue, value) {
+  contextValue[setContextValueSymbol](value);
+}
+function useContext(context, defaultValue) {
+  var _a;
+  const pro = context;
+  const type = typeof pro.__key;
+  if (type !== "string") {
+    throw new Error("Invalid context object");
+  }
+  const initialValue = (_a = defaultValue != null ? defaultValue : pro.__defaultValue) != null ? _a : null;
+  const val = {};
+  const dataMap = /* @__PURE__ */ new Map();
+  return new Proxy(val, {
+    get(_, key) {
+      if (typeof key !== "string") {
+        if (key === getContextSymbol) {
+          return context;
+        }
+        if (key === setContextValueSymbol) {
+          return function(newValue) {
+            if (!newValue) {
+              for (let dataMapElement of dataMap) {
+                dataMapElement[1].setSource(null);
+              }
+              return true;
+            }
+            for (let key2 in newValue) {
+              let value2 = dataMap.get(key2);
+              if (!value2) {
+                value2 = createDelegate(initialValue ? initialValue[key2] : null);
+                dataMap.set(key2, value2);
+              }
+              const v = newValue[key2];
+              if (isVariableOf2(v)) {
+                value2.setSource(v);
+              } else {
+                value2.setSource(createConstVar(v));
+              }
+            }
+            return true;
+          };
+        }
+        return void 0;
+      }
+      let value = dataMap.get(key);
+      if (value) {
+        return value;
+      }
+      if (!initialValue) {
+        value = createDelegate(null);
+        dataMap.set(key, value);
+        return value;
+      }
+      value = createDelegate(initialValue[key]);
+      dataMap.set(key, value);
+      return value;
+    }
+  });
+}
+function randomUUID() {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === "x" ? r : r & 3 | 8;
+    return v.toString(16);
+  });
+}
+function createContext(key, defaultValue) {
+  if (!key) {
+    throw new Error("Context key cannot be empty");
+  }
+  const id = randomUUID();
+  const result = {
+    __defaultValue: defaultValue,
+    get __key() {
+      return key;
+    },
+    get __id() {
+      return id;
+    }
+  };
+  return result;
+}
+
+// src/utils/string-utils.ts
+function capitalize(str) {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
+// src/element/context.ts
+var providers = /* @__PURE__ */ new Map();
+function applyContext(element2, lifecycle, contextValue) {
+  if (!contextValue) {
+    return;
+  }
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable;
+    }
+    const context = getContext(contextValue);
+    const provider = findContextProvider(element2, context);
+    if (!provider) {
+      return emptyDisposable;
+    }
+    setContextValue(contextValue, provider.value);
+    return emptyDisposable;
+  });
+}
+function findContextProvider(element2, context) {
+  if (!context) {
+    return null;
+  }
+  let el = element2;
+  const keyToFind = getDataKey(context.__key);
+  while (el != null) {
+    const providerId = el.dataset[keyToFind];
+    if (providerId) {
+      const result = providers.get(providerId);
+      if (result) {
+        return result;
+      }
+      console.warn("Invalid context provider id");
+    }
+    el = el.parentElement;
+  }
+  console.error("No context provider found");
+  return null;
+}
+function ContextProvider(props) {
+  const provider = createProvider(props.context, props.value);
+  if (!props.children) {
+    return null;
+  }
+  applyContextProvider(props.children, provider);
+  return props.children;
+}
+function applyContextProvider(children, provider) {
+  if (!provider) {
+    return;
+  }
+  if (children instanceof HTMLElement) {
+    children.dataset[provider.dataKey] = provider.id;
+    return;
+  }
+  if (isVariableOf3(children)) {
+    children.subscribe((value) => {
+      applyContextProvider(value, provider);
+    });
+    return;
+  }
+  if (Array.isArray(children)) {
+    for (let child of children) {
+      applyContextProvider(child, provider);
+    }
+    return;
+  }
+  console.warn("Invalid children type");
+}
+function createProvider(context, value) {
+  const key = context.__key;
+  const id = context.__id;
+  if (typeof key !== "string") {
+    throw new Error("Invalid context object");
+  }
+  if (typeof id !== "string") {
+    throw new Error("Invalid context object");
+  }
+  let dataKey = getDataKey(key);
+  const provider = {
+    context,
+    value,
+    key,
+    id,
+    dataKey
+  };
+  providers.set(id, provider);
+  return provider;
+}
+function getDataKey(key) {
+  return "elCtx" + capitalize(key.replace("-", ""));
+}
+
 // src/element/index.ts
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
@@ -1135,6 +1327,10 @@ function applyOptions(element2, elementOptions, lifecycle) {
     }
     if (key === "controller") {
       applyController(element2, value);
+      continue;
+    }
+    if (key === "context") {
+      applyContext(element2, lifecycle, value);
       continue;
     }
     if (key.startsWith("on")) {
@@ -1182,7 +1378,7 @@ function applyClasses(element2, lifecycle, classes) {
   if (!classes) {
     return;
   }
-  if (!isVariableOf2(classes)) {
+  if (!isVariableOf4(classes)) {
     element2.classList.add(...classes.filter((c) => !!c));
     return;
   }
@@ -1225,7 +1421,7 @@ function applyStyle(element2, lifecycle, style2) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore();
-    if (isVariableOf2(style2)) {
+    if (isVariableOf4(style2)) {
       const dispoMapStore = new DisposableMapStore();
       disposables.add(dispoMapStore);
       disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
@@ -1238,7 +1434,7 @@ function applyStyle(element2, lifecycle, style2) {
         if (changesToAddOrModify !== null) {
           for (let key in changesToAddOrModify) {
             const value = changesToAddOrModify[key];
-            if (isVariableOf2(value)) {
+            if (isVariableOf4(value)) {
               dispoMapStore.set(key, value.subscribe((newValue) => {
                 if (newValue === void 0) {
                   element2.style.removeProperty(key);
@@ -1261,7 +1457,7 @@ function applyStyle(element2, lifecycle, style2) {
       let styleKey;
       for (styleKey in style2) {
         const value = style2[styleKey];
-        if (isVariableOf2(value)) {
+        if (isVariableOf4(value)) {
           disposables.add(value.subscribe((newValue) => {
             if (newValue === void 0) {
               element2.style.removeProperty(styleKey);
@@ -1285,7 +1481,7 @@ function applyDataset(element2, lifecycle, dataset) {
   if (!dataset) {
     return;
   }
-  if (!isVariableOf2(dataset)) {
+  if (!isVariableOf4(dataset)) {
     for (let key in dataset) {
       element2.dataset[key] = dataset[key];
     }
@@ -1311,7 +1507,7 @@ function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
     return;
   }
-  if (!isVariableOf2(onMount)) {
+  if (!isVariableOf4(onMount)) {
     lifecycle.subscribeDisposable((active) => {
       var _a;
       return active ? createDisposable((_a = onMount.call(element2)) != null ? _a : emptyDisposable) : emptyDisposable;
@@ -1327,7 +1523,7 @@ function applyProperty(element2, lifecycle, key, value) {
   if (value === void 0) {
     return;
   }
-  if (!isVariableOf2(value)) {
+  if (!isVariableOf4(value)) {
     element2[key] = value;
     return;
   }
@@ -1339,7 +1535,7 @@ function applyParent(element2, lifecycle, parent) {
   if (!parent) {
     return;
   }
-  if (!isVariableOf2(parent)) {
+  if (!isVariableOf4(parent)) {
     parent.appendChild(element2);
     return;
   }
@@ -1376,6 +1572,31 @@ function listenObjectKVChanges(variable, handler) {
   return subscription;
 }
 runMutationObserver();
+
+// src/components/theme-style.ts
+import { Vary } from "@tioniq/eventiq";
+var theme = new Vary("dark");
+function getThemeStyle(forTheme) {
+  forTheme = forTheme != null ? forTheme : theme;
+  return {
+    normalColor: new Vary("#232323"),
+    primaryColor: new Vary("#227093"),
+    secondaryColor: new Vary("#706fd3"),
+    successColor: new Vary("#33d9b2"),
+    errorColor: new Vary("#ff5252"),
+    warningColor: new Vary("#ffda79"),
+    infoColor: new Vary("#34ace0"),
+    textColor: forTheme.map((t) => t === "dark" ? "#ffffff" : "#000000")
+  };
+}
+function getThemeStyleFromContext(context) {
+  return getThemeStyle(context.theme);
+}
+var themeStyle = getThemeStyle(theme);
+function createThemeContext() {
+  return createContext("theme");
+}
+var ThemeContext = createThemeContext();
 
 // src/dom/dom-elements.ts
 function text(text2) {
@@ -1975,15 +2196,15 @@ function getFirstWord(str) {
 import { combine, createConst as createConst2 } from "@tioniq/eventiq";
 
 // src/variable/variable.ts
-import { createConst, isVariableOf as isVariableOf3 } from "@tioniq/eventiq";
+import { createConst, isVariableOf as isVariableOf5 } from "@tioniq/eventiq";
 function toVariable(value) {
-  if (isVariableOf3(value)) {
+  if (isVariableOf5(value)) {
     return value;
   }
   return createConst(value != null ? value : null);
 }
 function toDefinedVariable(value, defaultValue) {
-  if (isVariableOf3(value)) {
+  if (isVariableOf5(value)) {
     return value.map((v) => v != null ? v : defaultValue);
   }
   return createConst(value != null ? value : defaultValue);
@@ -2044,23 +2265,6 @@ var buttonStyles = makeClassStyles({
   }
 });
 
-// src/components/theme-style.ts
-import { Vary } from "@tioniq/eventiq";
-var theme = new Vary("dark");
-function createThemeStyle(theme2) {
-  return {
-    normalColor: new Vary("#232323"),
-    primaryColor: new Vary("#227093"),
-    secondaryColor: new Vary("#706fd3"),
-    successColor: new Vary("#33d9b2"),
-    errorColor: new Vary("#ff5252"),
-    warningColor: new Vary("#ffda79"),
-    infoColor: new Vary("#34ace0"),
-    textColor: theme2.map((t) => t === "dark" ? "#ffffff" : "#000000")
-  };
-}
-var themeStyle = createThemeStyle(theme);
-
 // src/components/Button.tsx
 function Button(props) {
   let controller = props.controller == void 0 ? void 0 : createController();
@@ -2074,6 +2278,8 @@ function Button(props) {
       }
     });
   }
+  const context = useContext(ThemeContext);
+  const themeStyle2 = getThemeStyleFromContext(context);
   const variant = toDefinedVariable(props.variant, "normal");
   const appearance = toDefinedVariable(props.appearance, "normal");
   const size = toDefinedVariable(props.size, "normal");
@@ -2085,7 +2291,7 @@ function Button(props) {
       return (_a = buttonStyles[`button-size-${s2}`]) != null ? _a : "";
     })
   );
-  const variantColor = variant.switchMap((v) => themeStyle[`${v}Color`]);
+  const variantColor = variant.switchMap((v) => themeStyle2[`${v}Color`]);
   const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
   const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : createConst2("transparent"));
   const borderColor = variantColor;
@@ -2098,7 +2304,7 @@ function Button(props) {
       case "outline":
         return variantColor;
       default:
-        return themeStyle.textColor;
+        return themeStyle2.textColor;
     }
   });
   const textDecoration = appearance.map((a2) => a2 === "link" ? "underline" : "none");
@@ -2118,7 +2324,8 @@ function Button(props) {
     onClick: props.onClick,
     children: props.children,
     type: props.type,
-    disabled: props.disabled
+    disabled: props.disabled,
+    context
   });
 }
 function lightenColor(hex, percent) {
@@ -2167,6 +2374,8 @@ var jsxs = renderJsx;
 var jsxDEV = renderJsx;
 export {
   Button,
+  ContextProvider,
+  ThemeContext,
   a,
   abbr,
   addModifier,
@@ -2193,7 +2402,9 @@ export {
   code,
   col,
   colgroup,
+  createContext,
   createController,
+  createThemeContext,
   data,
   datalist,
   dd,
@@ -2213,6 +2424,8 @@ export {
   figure,
   footer,
   form,
+  getThemeStyle,
+  getThemeStyleFromContext,
   h1,
   h2,
   h3,
@@ -2286,12 +2499,15 @@ export {
   tfoot,
   th,
   thead,
+  theme,
+  themeStyle,
   time,
   title,
   tr,
   track,
   u,
   ul,
+  useContext,
   useController,
   useFunctionController,
   var_,
