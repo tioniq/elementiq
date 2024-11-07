@@ -19,7 +19,10 @@ export function getThemeStyle(forTheme?: Var<keyof Theme>) {
     errorColor: new Vary("#ff5252"),
     warningColor: new Vary("#ffda79"),
     infoColor: new Vary("#34ace0"),
-    textColor: forTheme.map(t => t === "dark" ? "#ffffff" : "#000000"),
+    textColor: forTheme.map(t => {
+      // console.debug("Getting text color for theme", t)
+      return t === "dark" ? "#ffffff" : "#000000";
+    }),
   }
 }
 

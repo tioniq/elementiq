@@ -479,6 +479,11 @@ var AsyncDisposableAction = class extends AsyncDisposiq {
     });
   }
 };
+var ObjectDisposedException = class extends Error {
+  constructor(message) {
+    super(message || "Object disposed");
+  }
+};
 var Node2 = class {
   constructor(value) {
     this.value = value;
@@ -580,6 +585,30 @@ var ObjectPool = class {
   }
 };
 var pool = new ObjectPool(10);
+var asyncPool = new ObjectPool(10);
+function justDispose(disposable) {
+  if (!disposable) {
+    return;
+  }
+  if (typeof disposable === "function") {
+    disposable();
+  } else {
+    disposable.dispose();
+  }
+}
+function justDisposeAll(disposables) {
+  for (let i2 = 0; i2 < disposables.length; ++i2) {
+    const disposable = disposables[i2];
+    if (!disposable) {
+      continue;
+    }
+    if (typeof disposable === "function") {
+      disposable();
+    } else {
+      disposable.dispose();
+    }
+  }
+}
 function disposeAll(disposables) {
   let size = disposables.length;
   if (size === 0) {
@@ -597,22 +626,25 @@ function disposeAll(disposables) {
     holder[i2] = disposables[i2];
   }
   disposables.length = 0;
-  for (let i2 = 0; i2 < size; ++i2) {
-    const disposable = holder[i2];
-    if (!disposable) {
-      continue;
+  try {
+    for (let i2 = 0; i2 < size; ++i2) {
+      const disposable = holder[i2];
+      if (!disposable) {
+        continue;
+      }
+      if (typeof disposable === "function") {
+        disposable();
+      } else {
+        disposable.dispose();
+      }
     }
-    if (typeof disposable === "function") {
-      disposable();
-    } else {
-      disposable.dispose();
+  } finally {
+    holder.fill(void 0, 0, size);
+    if (pool.full) {
+      pool.size *= 2;
     }
+    pool.throw(holder);
   }
-  holder.fill(void 0, 0, size);
-  if (pool.full) {
-    pool.size *= 2;
-  }
-  pool.throw(holder);
 }
 function disposeAllUnsafe(disposables) {
   for (let i2 = 0; i2 < disposables.length; ++i2) {
@@ -628,11 +660,27 @@ function disposeAllUnsafe(disposables) {
   }
   disposables.length = 0;
 }
-var ObjectDisposedException = class extends Error {
-  constructor(message) {
-    super(message || "Object disposed");
+function disposeAllSafely(disposables, onErrorCallback) {
+  if (disposables.length === 0) {
+    return;
   }
-};
+  for (let i2 = 0; i2 < disposables.length; ++i2) {
+    const disposable = disposables[i2];
+    if (!disposable) {
+      continue;
+    }
+    try {
+      if (typeof disposable === "function") {
+        disposable();
+      } else {
+        disposable.dispose();
+      }
+    } catch (e) {
+      onErrorCallback == null ? void 0 : onErrorCallback(e);
+    }
+  }
+  disposables.length = 0;
+}
 var DisposableStore = class _DisposableStore extends Disposiq {
   constructor() {
     super();
@@ -650,27 +698,15 @@ var DisposableStore = class _DisposableStore extends Disposiq {
    * @param disposables disposables to add
    */
   add(...disposables) {
-    this.addAll(disposables);
-  }
-  /**
-   * Adds disposables to the container. If the container has already been disposed, the disposables will be disposed.
-   * @param disposables Disposables to add.
-   */
-  addAll(disposables) {
     if (!disposables || disposables.length === 0) {
       return;
     }
+    const first = disposables[0];
+    if (Array.isArray(first)) {
+      disposables = first;
+    }
     if (this._disposed) {
-      for (const disposable of disposables) {
-        if (!disposable) {
-          continue;
-        }
-        if (typeof disposable === "function") {
-          disposable();
-        } else {
-          disposable.dispose();
-        }
-      }
+      justDisposeAll(disposables);
       return;
     }
     for (let i2 = 0; i2 < disposables.length; i2++) {
@@ -678,7 +714,27 @@ var DisposableStore = class _DisposableStore extends Disposiq {
       if (!disposable) {
         continue;
       }
-      this._disposables.push(typeof disposable === "function" ? new DisposableAction(disposable) : disposable);
+      this._disposables.push(disposable);
+    }
+  }
+  /**
+   * Add multiple disposables to the store. If the store has already been disposed, the disposables will be disposed.
+   * @param disposables an array of disposables to add
+   */
+  addAll(disposables) {
+    if (!disposables || disposables.length === 0) {
+      return;
+    }
+    if (this._disposed) {
+      justDisposeAll(disposables);
+      return;
+    }
+    for (let i2 = 0; i2 < disposables.length; i2++) {
+      const disposable = disposables[i2];
+      if (!disposable) {
+        continue;
+      }
+      this._disposables.push(disposable);
     }
   }
   /**
@@ -691,24 +747,20 @@ var DisposableStore = class _DisposableStore extends Disposiq {
       return;
     }
     if (this._disposed) {
-      if (typeof disposable === "function") {
-        disposable();
-      } else {
-        disposable.dispose();
-      }
+      justDispose(disposable);
       return;
-    }
-    if (typeof disposable === "function") {
-      disposable = new DisposableAction(disposable);
     }
     this._disposables.push(disposable);
   }
   /**
-   * Remove a disposable from the store. If the disposable is found and removed, it will be disposed.
+   * Remove a disposable from the store. If the disposable is found and removed, it will NOT be disposed
    * @param disposable a disposable to remove
    * @returns true if the disposable was found and removed
    */
   remove(disposable) {
+    if (!disposable || this._disposed) {
+      return false;
+    }
     const index = this._disposables.indexOf(disposable);
     if (index === -1) {
       return false;
@@ -722,10 +774,10 @@ var DisposableStore = class _DisposableStore extends Disposiq {
   addTimeout(callbackOrTimeout, timeout) {
     if (typeof callbackOrTimeout === "function") {
       const handle = setTimeout(callbackOrTimeout, timeout);
-      this.add(() => clearTimeout(handle));
+      this.addOne(() => clearTimeout(handle));
       return;
     }
-    this.add(() => clearTimeout(callbackOrTimeout));
+    this.addOne(() => clearTimeout(callbackOrTimeout));
   }
   /**
    * @internal
@@ -733,10 +785,10 @@ var DisposableStore = class _DisposableStore extends Disposiq {
   addInterval(callbackOrInterval, interval) {
     if (typeof callbackOrInterval === "function") {
       const handle = setInterval(callbackOrInterval, interval);
-      this.add(() => clearInterval(handle));
+      this.addOne(() => clearInterval(handle));
       return;
     }
-    this.add(() => clearInterval(callbackOrInterval));
+    this.addOne(() => clearInterval(callbackOrInterval));
   }
   /**
    * Throw an exception if the object has been disposed.
@@ -747,13 +799,6 @@ var DisposableStore = class _DisposableStore extends Disposiq {
       throw new ObjectDisposedException(message);
     }
   }
-  dispose() {
-    if (this._disposed) {
-      return;
-    }
-    this._disposed = true;
-    disposeAllUnsafe(this._disposables);
-  }
   /**
    * Dispose all disposables in the store. The store does not become disposed. The disposables are removed from the
    * store. The store can continue to be used after this method is called. This method is useful when the store is
@@ -761,7 +806,28 @@ var DisposableStore = class _DisposableStore extends Disposiq {
    * this method will safely add the disposable to the store without disposing it immediately.
    */
   disposeCurrent() {
+    if (this._disposed) {
+      return;
+    }
     disposeAll(this._disposables);
+  }
+  /**
+   * Dispose the store and all disposables safely. If an error occurs during disposal, the error is caught and
+   * passed to the onErrorCallback.
+   */
+  disposeSafely(onErrorCallback) {
+    if (this._disposed) {
+      return;
+    }
+    this._disposed = true;
+    disposeAllSafely(this._disposables, onErrorCallback);
+  }
+  dispose() {
+    if (this._disposed) {
+      return;
+    }
+    this._disposed = true;
+    disposeAllUnsafe(this._disposables);
   }
   static from(disposables, mapper) {
     if (typeof mapper === "function") {
@@ -947,6 +1013,9 @@ var DisposableMapStore = class extends Disposiq {
 };
 Disposiq.prototype.disposeWith = function(container) {
   return container.add(this);
+};
+Disposiq.prototype.toFunction = function() {
+  return () => this.dispose();
 };
 var ExceptionHandlerManager = class {
   /**
@@ -1468,7 +1537,14 @@ function element(tag, elementOptions) {
 function applyOptions(element2, elementOptions, lifecycle) {
   let parent = void 0;
   let key;
+  const context = elementOptions.context;
+  if (context != void 0) {
+    applyContext(element2, lifecycle, context);
+  }
   for (key in elementOptions) {
+    if (key === "context") {
+      continue;
+    }
     const value = elementOptions[key];
     if (key === "children") {
       applyChildren(element2, lifecycle, value);
@@ -1492,10 +1568,6 @@ function applyOptions(element2, elementOptions, lifecycle) {
     }
     if (key === "controller") {
       applyController(element2, value);
-      continue;
-    }
-    if (key === "context") {
-      applyContext(element2, lifecycle, value);
       continue;
     }
     if (key.startsWith("on")) {
@@ -1751,7 +1823,9 @@ function getThemeStyle(forTheme) {
     errorColor: new import_eventiq6.Vary("#ff5252"),
     warningColor: new import_eventiq6.Vary("#ffda79"),
     infoColor: new import_eventiq6.Vary("#34ace0"),
-    textColor: forTheme.map((t) => t === "dark" ? "#ffffff" : "#000000")
+    textColor: forTheme.map((t) => {
+      return t === "dark" ? "#ffffff" : "#000000";
+    })
   };
 }
 function getThemeStyleFromContext(context) {

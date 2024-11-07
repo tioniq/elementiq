@@ -49,7 +49,14 @@ export function element<K extends keyof HTMLElementTagNameMap>(tag: K, elementOp
 function applyOptions<K extends keyof HTMLElementTagNameMap, E extends HTMLElementTagNameMap[K] = HTMLElementTagNameMap[K]>(element: E, elementOptions: ElementOptions<E>, lifecycle: Var<boolean>) {
   let parent: VarOrVal<ParentNode | undefined> | undefined = undefined
   let key: keyof ElementOptions<E>
+  const context = elementOptions.context
+  if (context != undefined) {
+    applyContext(element, lifecycle, context)
+  }
   for (key in elementOptions) {
+    if (key === "context") {
+      continue
+    }
     const value = elementOptions[key]
     if (key === "children") {
       applyChildren(element, lifecycle, value)
@@ -73,10 +80,6 @@ function applyOptions<K extends keyof HTMLElementTagNameMap, E extends HTMLEleme
     }
     if (key === "controller") {
       applyController(element, value)
-      continue
-    }
-    if (key === "context") {
-      applyContext(element, lifecycle, value)
       continue
     }
     if (key.startsWith("on")) {
