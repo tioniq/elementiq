@@ -115,88 +115,6 @@ function getObjectValuesChanges(oldRecord, newRecord, equalityComparer) {
   return [keysToDelete, toAddOrChange];
 }
 
-// src/diff/array.ts
-function getArrayChanges(oldArray, newArray) {
-  const oldArrayLength = oldArray.length;
-  const newArrayLength = newArray.length;
-  const resultAdd = [];
-  const resultRemove = [];
-  const resultSwap = [];
-  const result = {
-    add: resultAdd,
-    remove: resultRemove,
-    swap: resultSwap
-  };
-  const newArrayData = newArray.map((item) => ({
-    item,
-    oldIndex: -1,
-    moveIndex: -1
-  }));
-  for (let i2 = 0; i2 < oldArrayLength; i2++) {
-    const oldItem = oldArray[i2];
-    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
-    if (newItemDataIndex === -1) {
-      resultRemove.push({
-        item: oldItem,
-        index: i2
-      });
-      continue;
-    }
-    const newData = newArrayData[newItemDataIndex];
-    newData.oldIndex = i2;
-    newData.moveIndex = i2;
-  }
-  const removedCount = resultRemove.length;
-  if (removedCount > 0) {
-    for (let i2 = 0; i2 < newArrayLength; ++i2) {
-      const newItemData = newArrayData[i2];
-      if (newItemData.oldIndex === -1) {
-        continue;
-      }
-      let removesCount = 0;
-      for (let j = 0; j < removedCount; ++j) {
-        if (resultRemove[j].index < newItemData.oldIndex) {
-          removesCount++;
-        } else {
-          break;
-        }
-      }
-      newItemData.moveIndex -= removesCount;
-    }
-  }
-  let addCounter = 0;
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      resultAdd.push({
-        item: newItemData.item,
-        index: i2
-      });
-      addCounter++;
-      continue;
-    }
-    newArrayData[i2].moveIndex += addCounter;
-  }
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      continue;
-    }
-    if (i2 === newItemData.moveIndex) {
-      continue;
-    }
-    const swapWith = newArrayData[newItemData.moveIndex];
-    resultSwap.push({
-      item: newItemData.item,
-      index: newItemData.moveIndex,
-      newIndex: i2
-    });
-    swapWith.moveIndex = newItemData.moveIndex;
-    newItemData.moveIndex = i2;
-  }
-  return result;
-}
-
 // node_modules/@tioniq/disposiq/dist/index.js
 var __async = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
@@ -899,7 +817,7 @@ var ExceptionHandlerManager = class {
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
 // src/element/index.ts
-import { isVariableOf as isVariableOf4, LazyVariable } from "@tioniq/eventiq";
+import { isVariableOf as isVariableOf5, LazyVariable } from "@tioniq/eventiq";
 
 // src/element/modifier.ts
 var modifiers = [];
@@ -973,8 +891,96 @@ function useFunctionController(controller, handler) {
 
 // src/element/children.ts
 import { isVariableOf } from "@tioniq/eventiq";
+
+// src/diff/array.ts
+function getArrayChanges(oldArray, newArray) {
+  const oldArrayLength = oldArray.length;
+  const newArrayLength = newArray.length;
+  const resultAdd = [];
+  const resultRemove = [];
+  const resultSwap = [];
+  const result = {
+    add: resultAdd,
+    remove: resultRemove,
+    swap: resultSwap
+  };
+  const newArrayData = newArray.map((item) => ({
+    item,
+    oldIndex: -1,
+    moveIndex: -1
+  }));
+  for (let i2 = 0; i2 < oldArrayLength; i2++) {
+    const oldItem = oldArray[i2];
+    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
+    if (newItemDataIndex === -1) {
+      resultRemove.push({
+        item: oldItem,
+        index: i2
+      });
+      continue;
+    }
+    const newData = newArrayData[newItemDataIndex];
+    newData.oldIndex = i2;
+    newData.moveIndex = i2;
+  }
+  const removedCount = resultRemove.length;
+  if (removedCount > 0) {
+    for (let i2 = 0; i2 < newArrayLength; ++i2) {
+      const newItemData = newArrayData[i2];
+      if (newItemData.oldIndex === -1) {
+        continue;
+      }
+      let removesCount = 0;
+      for (let j = 0; j < removedCount; ++j) {
+        if (resultRemove[j].index < newItemData.oldIndex) {
+          removesCount++;
+        } else {
+          break;
+        }
+      }
+      newItemData.moveIndex -= removesCount;
+    }
+  }
+  let addCounter = 0;
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      resultAdd.push({
+        item: newItemData.item,
+        index: i2
+      });
+      addCounter++;
+      continue;
+    }
+    newArrayData[i2].moveIndex += addCounter;
+  }
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      continue;
+    }
+    if (i2 === newItemData.moveIndex) {
+      continue;
+    }
+    const swapWith = newArrayData[newItemData.moveIndex];
+    resultSwap.push({
+      item: newItemData.item,
+      index: newItemData.moveIndex,
+      newIndex: i2
+    });
+    swapWith.moveIndex = newItemData.moveIndex;
+    newItemData.moveIndex = i2;
+  }
+  return result;
+}
+
+// src/element/children.ts
 function applyChildren(element2, lifecycle, children) {
   if (!children) {
+    return;
+  }
+  if (!isVariableOf(children)) {
+    setChildrenStatically(children, element2, lifecycle);
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -1131,6 +1137,48 @@ function setChildren(children, element2, mark2) {
       element2.removeChild(node);
     }
   };
+}
+function setChildrenStatically(children, element2, lifecycle) {
+  if (!Array.isArray(children)) {
+    const node = createNode(children);
+    element2.appendChild(node);
+    return;
+  }
+  if (children.length === 0) {
+    return;
+  }
+  for (let i2 = 0; i2 < children.length; i2++) {
+    const child = children[i2];
+    if (!isVariableOf(child)) {
+      setChildrenStatically(child, element2, lifecycle);
+      continue;
+    }
+    const slot2 = createEmptyNode();
+    element2.appendChild(slot2);
+    lifecycle.subscribeDisposable((active) => {
+      if (!active) {
+        return emptyDisposable;
+      }
+      let controller = null;
+      const disposables = new DisposableStore();
+      disposables.add(child.subscribe(updateChildren));
+      disposables.add(new DisposableAction(() => {
+        if (controller) {
+          controller.remove();
+          controller = null;
+        }
+      }));
+      return disposables;
+      function updateChildren(newChildrenOpts) {
+        if (!controller) {
+          controller = setChildren(newChildrenOpts, element2, slot2);
+          return;
+        }
+        controller = controller.replace(newChildrenOpts);
+      }
+    });
+  }
+  return;
 }
 function createNode(value) {
   if (!value) {
@@ -1352,10 +1400,49 @@ function getDataKey(key) {
   return "elCtx" + capitalize(key.replace("-", ""));
 }
 
+// src/element/classes.ts
+import { isVariableOf as isVariableOf4 } from "@tioniq/eventiq";
+var emptyStringArray = [];
+function applyClasses(element2, lifecycle, classes) {
+  if (!classes) {
+    return;
+  }
+  if (!isVariableOf4(classes)) {
+    element2.classList.add(...classes.filter((c) => !!c));
+    return;
+  }
+  let previousClasses = emptyStringArray;
+  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable : classes.subscribe((newClasses) => {
+    if (!Array.isArray(newClasses) || newClasses.length === 0) {
+      if (previousClasses.length === 0) {
+        return;
+      }
+      for (let i2 = 0; i2 < previousClasses.length; ++i2) {
+        element2.classList.remove(previousClasses[i2]);
+      }
+      previousClasses = emptyStringArray;
+      return;
+    }
+    const newValues = [...newClasses.filter((c) => !!c)];
+    if (previousClasses.length === 0) {
+      element2.classList.add.apply(element2.classList, newValues);
+      previousClasses = newValues;
+      return;
+    }
+    const changes = getArrayChanges(previousClasses, newValues);
+    for (let i2 = 0; i2 < changes.remove.length; ++i2) {
+      element2.classList.remove(changes.remove[i2].item);
+    }
+    for (let i2 = 0; i2 < changes.add.length; ++i2) {
+      element2.classList.add(changes.add[i2].item);
+    }
+    previousClasses = newValues;
+  }));
+}
+
 // src/element/index.ts
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
-var emptyStringArray = [];
 function element(tag, elementOptions) {
   const element2 = document.createElement(tag);
   if (elementOptions == void 0) {
@@ -1446,46 +1533,35 @@ function createLifecycle(element2) {
     });
   }, () => element2.isConnected);
 }
-function applyClasses(element2, lifecycle, classes) {
-  if (!classes) {
-    return;
-  }
-  if (!isVariableOf4(classes)) {
-    element2.classList.add(...classes.filter((c) => !!c));
-    return;
-  }
-  let previousClasses = emptyStringArray;
-  lifecycle.subscribeDisposable((active) => {
-    return !active ? emptyDisposable : classes.subscribe((newClasses) => {
-      if (!Array.isArray(newClasses) || newClasses.length === 0) {
-        if (previousClasses.length === 0) {
-          return;
-        }
-        for (let i2 = 0; i2 < previousClasses.length; ++i2) {
-          element2.classList.remove(previousClasses[i2]);
-        }
-        previousClasses = emptyStringArray;
-        return;
-      }
-      const newValues = [...newClasses.filter((c) => !!c)];
-      if (previousClasses.length === 0) {
-        element2.classList.add.apply(element2.classList, newValues);
-        previousClasses = newValues;
-        return;
-      }
-      const changes = getArrayChanges(previousClasses, newValues);
-      for (let i2 = 0; i2 < changes.remove.length; ++i2) {
-        element2.classList.remove(changes.remove[i2].item);
-      }
-      for (let i2 = 0; i2 < changes.add.length; ++i2) {
-        element2.classList.add(changes.add[i2].item);
-      }
-      previousClasses = newValues;
-    });
-  });
-}
 function applyStyle(element2, lifecycle, style2) {
   if (!style2) {
+    return;
+  }
+  if (!isVariableOf5(style2)) {
+    let styleKey;
+    for (styleKey in style2) {
+      const value = style2[styleKey];
+      if (!isVariableOf5(value)) {
+        if (value === void 0) {
+          element2.style.removeProperty(styleKey);
+          continue;
+        }
+        element2.style[styleKey] = value != null ? value : "";
+        continue;
+      }
+      lifecycle.subscribeDisposable((active) => {
+        if (!active) {
+          return emptyDisposable;
+        }
+        return value.subscribe((newValue) => {
+          if (newValue === void 0) {
+            element2.style.removeProperty(styleKey);
+            return;
+          }
+          element2.style[styleKey] = newValue != null ? newValue : "";
+        });
+      });
+    }
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -1493,59 +1569,37 @@ function applyStyle(element2, lifecycle, style2) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore();
-    if (isVariableOf4(style2)) {
-      const dispoMapStore = new DisposableMapStore();
-      disposables.add(dispoMapStore);
-      disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
-        if (keysToDelete !== null) {
-          for (let key of keysToDelete) {
-            element2.style.removeProperty(key);
-            dispoMapStore.delete(key);
-          }
+    const dispoMapStore = new DisposableMapStore();
+    disposables.add(dispoMapStore);
+    disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
+      if (keysToDelete !== null) {
+        for (let key of keysToDelete) {
+          element2.style.removeProperty(key);
+          dispoMapStore.delete(key);
         }
-        if (changesToAddOrModify !== null) {
-          for (let key in changesToAddOrModify) {
-            const value = changesToAddOrModify[key];
-            if (isVariableOf4(value)) {
-              dispoMapStore.set(key, value.subscribe((newValue) => {
-                if (newValue === void 0) {
-                  element2.style.removeProperty(key);
-                  return;
-                }
-                element2.style[key] = newValue != null ? newValue : "";
-              }));
-              continue;
-            }
-            dispoMapStore.delete(key);
-            if (value === void 0) {
-              element2.style.removeProperty(key);
-              continue;
-            }
-            element2.style[key] = value != null ? value : "";
-          }
-        }
-      }));
-    } else {
-      let styleKey;
-      for (styleKey in style2) {
-        const value = style2[styleKey];
-        if (isVariableOf4(value)) {
-          disposables.add(value.subscribe((newValue) => {
-            if (newValue === void 0) {
-              element2.style.removeProperty(styleKey);
-              return;
-            }
-            element2.style[styleKey] = newValue != null ? newValue : "";
-          }));
-          continue;
-        }
-        if (value === void 0) {
-          element2.style.removeProperty(styleKey);
-          continue;
-        }
-        element2.style[styleKey] = value != null ? value : "";
       }
-    }
+      if (changesToAddOrModify !== null) {
+        for (let key in changesToAddOrModify) {
+          const value = changesToAddOrModify[key];
+          if (isVariableOf5(value)) {
+            dispoMapStore.set(key, value.subscribe((newValue) => {
+              if (newValue === void 0) {
+                element2.style.removeProperty(key);
+                return;
+              }
+              element2.style[key] = newValue != null ? newValue : "";
+            }));
+            continue;
+          }
+          dispoMapStore.delete(key);
+          if (value === void 0) {
+            element2.style.removeProperty(key);
+            continue;
+          }
+          element2.style[key] = value != null ? value : "";
+        }
+      }
+    }));
     return disposables;
   });
 }
@@ -1553,7 +1607,7 @@ function applyDataset(element2, lifecycle, dataset) {
   if (!dataset) {
     return;
   }
-  if (!isVariableOf4(dataset)) {
+  if (!isVariableOf5(dataset)) {
     for (let key in dataset) {
       element2.dataset[key] = dataset[key];
     }
@@ -1579,7 +1633,7 @@ function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
     return;
   }
-  if (!isVariableOf4(onMount)) {
+  if (!isVariableOf5(onMount)) {
     lifecycle.subscribeDisposable((active) => {
       var _a;
       return active ? createDisposable((_a = onMount.call(element2)) != null ? _a : emptyDisposable) : emptyDisposable;
@@ -1595,7 +1649,7 @@ function applyProperty(element2, lifecycle, key, value) {
   if (value === void 0) {
     return;
   }
-  if (!isVariableOf4(value)) {
+  if (!isVariableOf5(value)) {
     element2[key] = value;
     return;
   }
@@ -1607,7 +1661,7 @@ function applyParent(element2, lifecycle, parent) {
   if (!parent) {
     return;
   }
-  if (!isVariableOf4(parent)) {
+  if (!isVariableOf5(parent)) {
     parent.appendChild(element2);
     return;
   }
@@ -2270,15 +2324,15 @@ function getFirstWord(str) {
 import { combine, createConst as createConst2 } from "@tioniq/eventiq";
 
 // src/variable/variable.ts
-import { createConst, isVariableOf as isVariableOf5 } from "@tioniq/eventiq";
+import { createConst, isVariableOf as isVariableOf6 } from "@tioniq/eventiq";
 function toVariable(value) {
-  if (isVariableOf5(value)) {
+  if (isVariableOf6(value)) {
     return value;
   }
   return createConst(value != null ? value : null);
 }
 function toDefinedVariable(value, defaultValue) {
-  if (isVariableOf5(value)) {
+  if (isVariableOf6(value)) {
     return value.map((v) => v != null ? v : defaultValue);
   }
   return createConst(value != null ? value : defaultValue);
@@ -2457,6 +2511,7 @@ export {
   addStyles,
   addTagModifier,
   address,
+  applyClasses,
   applyModification,
   area,
   article,

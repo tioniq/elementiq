@@ -14,3 +14,4 @@ export * from "./components/index.ts"
 export * from "@/jsx-runtime/types.ts"
 export * from "@/jsx-runtime/render.ts"
 export * from "@/jsx-runtime/index.ts"
+export { applyClasses } from "@/element/classes.js";

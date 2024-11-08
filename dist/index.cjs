@@ -30,6 +30,7 @@ __export(src_exports, {
   addStyles: () => addStyles,
   addTagModifier: () => addTagModifier,
   address: () => address,
+  applyClasses: () => applyClasses,
   applyModification: () => applyModification,
   area: () => area,
   article: () => article,
@@ -278,88 +279,6 @@ function getObjectValuesChanges(oldRecord, newRecord, equalityComparer) {
     }
   }
   return [keysToDelete, toAddOrChange];
-}
-
-// src/diff/array.ts
-function getArrayChanges(oldArray, newArray) {
-  const oldArrayLength = oldArray.length;
-  const newArrayLength = newArray.length;
-  const resultAdd = [];
-  const resultRemove = [];
-  const resultSwap = [];
-  const result = {
-    add: resultAdd,
-    remove: resultRemove,
-    swap: resultSwap
-  };
-  const newArrayData = newArray.map((item) => ({
-    item,
-    oldIndex: -1,
-    moveIndex: -1
-  }));
-  for (let i2 = 0; i2 < oldArrayLength; i2++) {
-    const oldItem = oldArray[i2];
-    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
-    if (newItemDataIndex === -1) {
-      resultRemove.push({
-        item: oldItem,
-        index: i2
-      });
-      continue;
-    }
-    const newData = newArrayData[newItemDataIndex];
-    newData.oldIndex = i2;
-    newData.moveIndex = i2;
-  }
-  const removedCount = resultRemove.length;
-  if (removedCount > 0) {
-    for (let i2 = 0; i2 < newArrayLength; ++i2) {
-      const newItemData = newArrayData[i2];
-      if (newItemData.oldIndex === -1) {
-        continue;
-      }
-      let removesCount = 0;
-      for (let j = 0; j < removedCount; ++j) {
-        if (resultRemove[j].index < newItemData.oldIndex) {
-          removesCount++;
-        } else {
-          break;
-        }
-      }
-      newItemData.moveIndex -= removesCount;
-    }
-  }
-  let addCounter = 0;
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      resultAdd.push({
-        item: newItemData.item,
-        index: i2
-      });
-      addCounter++;
-      continue;
-    }
-    newArrayData[i2].moveIndex += addCounter;
-  }
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      continue;
-    }
-    if (i2 === newItemData.moveIndex) {
-      continue;
-    }
-    const swapWith = newArrayData[newItemData.moveIndex];
-    resultSwap.push({
-      item: newItemData.item,
-      index: newItemData.moveIndex,
-      newIndex: i2
-    });
-    swapWith.moveIndex = newItemData.moveIndex;
-    newItemData.moveIndex = i2;
-  }
-  return result;
 }
 
 // node_modules/@tioniq/disposiq/dist/index.js
@@ -1064,7 +983,7 @@ var ExceptionHandlerManager = class {
 var safeDisposableExceptionHandlerManager = new ExceptionHandlerManager();
 
 // src/element/index.ts
-var import_eventiq5 = require("@tioniq/eventiq");
+var import_eventiq6 = require("@tioniq/eventiq");
 
 // src/element/modifier.ts
 var modifiers = [];
@@ -1138,8 +1057,96 @@ function useFunctionController(controller, handler) {
 
 // src/element/children.ts
 var import_eventiq2 = require("@tioniq/eventiq");
+
+// src/diff/array.ts
+function getArrayChanges(oldArray, newArray) {
+  const oldArrayLength = oldArray.length;
+  const newArrayLength = newArray.length;
+  const resultAdd = [];
+  const resultRemove = [];
+  const resultSwap = [];
+  const result = {
+    add: resultAdd,
+    remove: resultRemove,
+    swap: resultSwap
+  };
+  const newArrayData = newArray.map((item) => ({
+    item,
+    oldIndex: -1,
+    moveIndex: -1
+  }));
+  for (let i2 = 0; i2 < oldArrayLength; i2++) {
+    const oldItem = oldArray[i2];
+    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
+    if (newItemDataIndex === -1) {
+      resultRemove.push({
+        item: oldItem,
+        index: i2
+      });
+      continue;
+    }
+    const newData = newArrayData[newItemDataIndex];
+    newData.oldIndex = i2;
+    newData.moveIndex = i2;
+  }
+  const removedCount = resultRemove.length;
+  if (removedCount > 0) {
+    for (let i2 = 0; i2 < newArrayLength; ++i2) {
+      const newItemData = newArrayData[i2];
+      if (newItemData.oldIndex === -1) {
+        continue;
+      }
+      let removesCount = 0;
+      for (let j = 0; j < removedCount; ++j) {
+        if (resultRemove[j].index < newItemData.oldIndex) {
+          removesCount++;
+        } else {
+          break;
+        }
+      }
+      newItemData.moveIndex -= removesCount;
+    }
+  }
+  let addCounter = 0;
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      resultAdd.push({
+        item: newItemData.item,
+        index: i2
+      });
+      addCounter++;
+      continue;
+    }
+    newArrayData[i2].moveIndex += addCounter;
+  }
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      continue;
+    }
+    if (i2 === newItemData.moveIndex) {
+      continue;
+    }
+    const swapWith = newArrayData[newItemData.moveIndex];
+    resultSwap.push({
+      item: newItemData.item,
+      index: newItemData.moveIndex,
+      newIndex: i2
+    });
+    swapWith.moveIndex = newItemData.moveIndex;
+    newItemData.moveIndex = i2;
+  }
+  return result;
+}
+
+// src/element/children.ts
 function applyChildren(element2, lifecycle, children) {
   if (!children) {
+    return;
+  }
+  if (!(0, import_eventiq2.isVariableOf)(children)) {
+    setChildrenStatically(children, element2, lifecycle);
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -1296,6 +1303,48 @@ function setChildren(children, element2, mark2) {
       element2.removeChild(node);
     }
   };
+}
+function setChildrenStatically(children, element2, lifecycle) {
+  if (!Array.isArray(children)) {
+    const node = createNode(children);
+    element2.appendChild(node);
+    return;
+  }
+  if (children.length === 0) {
+    return;
+  }
+  for (let i2 = 0; i2 < children.length; i2++) {
+    const child = children[i2];
+    if (!(0, import_eventiq2.isVariableOf)(child)) {
+      setChildrenStatically(child, element2, lifecycle);
+      continue;
+    }
+    const slot2 = createEmptyNode();
+    element2.appendChild(slot2);
+    lifecycle.subscribeDisposable((active) => {
+      if (!active) {
+        return emptyDisposable;
+      }
+      let controller = null;
+      const disposables = new DisposableStore();
+      disposables.add(child.subscribe(updateChildren));
+      disposables.add(new DisposableAction(() => {
+        if (controller) {
+          controller.remove();
+          controller = null;
+        }
+      }));
+      return disposables;
+      function updateChildren(newChildrenOpts) {
+        if (!controller) {
+          controller = setChildren(newChildrenOpts, element2, slot2);
+          return;
+        }
+        controller = controller.replace(newChildrenOpts);
+      }
+    });
+  }
+  return;
 }
 function createNode(value) {
   if (!value) {
@@ -1517,10 +1566,49 @@ function getDataKey(key) {
   return "elCtx" + capitalize(key.replace("-", ""));
 }
 
+// src/element/classes.ts
+var import_eventiq5 = require("@tioniq/eventiq");
+var emptyStringArray = [];
+function applyClasses(element2, lifecycle, classes) {
+  if (!classes) {
+    return;
+  }
+  if (!(0, import_eventiq5.isVariableOf)(classes)) {
+    element2.classList.add(...classes.filter((c) => !!c));
+    return;
+  }
+  let previousClasses = emptyStringArray;
+  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable : classes.subscribe((newClasses) => {
+    if (!Array.isArray(newClasses) || newClasses.length === 0) {
+      if (previousClasses.length === 0) {
+        return;
+      }
+      for (let i2 = 0; i2 < previousClasses.length; ++i2) {
+        element2.classList.remove(previousClasses[i2]);
+      }
+      previousClasses = emptyStringArray;
+      return;
+    }
+    const newValues = [...newClasses.filter((c) => !!c)];
+    if (previousClasses.length === 0) {
+      element2.classList.add.apply(element2.classList, newValues);
+      previousClasses = newValues;
+      return;
+    }
+    const changes = getArrayChanges(previousClasses, newValues);
+    for (let i2 = 0; i2 < changes.remove.length; ++i2) {
+      element2.classList.remove(changes.remove[i2].item);
+    }
+    for (let i2 = 0; i2 < changes.add.length; ++i2) {
+      element2.classList.add(changes.add[i2].item);
+    }
+    previousClasses = newValues;
+  }));
+}
+
 // src/element/index.ts
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
-var emptyStringArray = [];
 function element(tag, elementOptions) {
   const element2 = document.createElement(tag);
   if (elementOptions == void 0) {
@@ -1594,7 +1682,7 @@ function applyOptions(element2, elementOptions, lifecycle) {
   }
 }
 function createLifecycle(element2) {
-  return new import_eventiq5.LazyVariable((vary) => {
+  return new import_eventiq6.LazyVariable((vary) => {
     element2.dataset[domListenKey] = "t";
     const attachListener = function() {
       vary.value = true;
@@ -1611,46 +1699,35 @@ function createLifecycle(element2) {
     });
   }, () => element2.isConnected);
 }
-function applyClasses(element2, lifecycle, classes) {
-  if (!classes) {
-    return;
-  }
-  if (!(0, import_eventiq5.isVariableOf)(classes)) {
-    element2.classList.add(...classes.filter((c) => !!c));
-    return;
-  }
-  let previousClasses = emptyStringArray;
-  lifecycle.subscribeDisposable((active) => {
-    return !active ? emptyDisposable : classes.subscribe((newClasses) => {
-      if (!Array.isArray(newClasses) || newClasses.length === 0) {
-        if (previousClasses.length === 0) {
-          return;
-        }
-        for (let i2 = 0; i2 < previousClasses.length; ++i2) {
-          element2.classList.remove(previousClasses[i2]);
-        }
-        previousClasses = emptyStringArray;
-        return;
-      }
-      const newValues = [...newClasses.filter((c) => !!c)];
-      if (previousClasses.length === 0) {
-        element2.classList.add.apply(element2.classList, newValues);
-        previousClasses = newValues;
-        return;
-      }
-      const changes = getArrayChanges(previousClasses, newValues);
-      for (let i2 = 0; i2 < changes.remove.length; ++i2) {
-        element2.classList.remove(changes.remove[i2].item);
-      }
-      for (let i2 = 0; i2 < changes.add.length; ++i2) {
-        element2.classList.add(changes.add[i2].item);
-      }
-      previousClasses = newValues;
-    });
-  });
-}
 function applyStyle(element2, lifecycle, style2) {
   if (!style2) {
+    return;
+  }
+  if (!(0, import_eventiq6.isVariableOf)(style2)) {
+    let styleKey;
+    for (styleKey in style2) {
+      const value = style2[styleKey];
+      if (!(0, import_eventiq6.isVariableOf)(value)) {
+        if (value === void 0) {
+          element2.style.removeProperty(styleKey);
+          continue;
+        }
+        element2.style[styleKey] = value != null ? value : "";
+        continue;
+      }
+      lifecycle.subscribeDisposable((active) => {
+        if (!active) {
+          return emptyDisposable;
+        }
+        return value.subscribe((newValue) => {
+          if (newValue === void 0) {
+            element2.style.removeProperty(styleKey);
+            return;
+          }
+          element2.style[styleKey] = newValue != null ? newValue : "";
+        });
+      });
+    }
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -1658,59 +1735,37 @@ function applyStyle(element2, lifecycle, style2) {
       return emptyDisposable;
     }
     const disposables = new DisposableStore();
-    if ((0, import_eventiq5.isVariableOf)(style2)) {
-      const dispoMapStore = new DisposableMapStore();
-      disposables.add(dispoMapStore);
-      disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
-        if (keysToDelete !== null) {
-          for (let key of keysToDelete) {
-            element2.style.removeProperty(key);
-            dispoMapStore.delete(key);
-          }
+    const dispoMapStore = new DisposableMapStore();
+    disposables.add(dispoMapStore);
+    disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
+      if (keysToDelete !== null) {
+        for (let key of keysToDelete) {
+          element2.style.removeProperty(key);
+          dispoMapStore.delete(key);
         }
-        if (changesToAddOrModify !== null) {
-          for (let key in changesToAddOrModify) {
-            const value = changesToAddOrModify[key];
-            if ((0, import_eventiq5.isVariableOf)(value)) {
-              dispoMapStore.set(key, value.subscribe((newValue) => {
-                if (newValue === void 0) {
-                  element2.style.removeProperty(key);
-                  return;
-                }
-                element2.style[key] = newValue != null ? newValue : "";
-              }));
-              continue;
-            }
-            dispoMapStore.delete(key);
-            if (value === void 0) {
-              element2.style.removeProperty(key);
-              continue;
-            }
-            element2.style[key] = value != null ? value : "";
-          }
-        }
-      }));
-    } else {
-      let styleKey;
-      for (styleKey in style2) {
-        const value = style2[styleKey];
-        if ((0, import_eventiq5.isVariableOf)(value)) {
-          disposables.add(value.subscribe((newValue) => {
-            if (newValue === void 0) {
-              element2.style.removeProperty(styleKey);
-              return;
-            }
-            element2.style[styleKey] = newValue != null ? newValue : "";
-          }));
-          continue;
-        }
-        if (value === void 0) {
-          element2.style.removeProperty(styleKey);
-          continue;
-        }
-        element2.style[styleKey] = value != null ? value : "";
       }
-    }
+      if (changesToAddOrModify !== null) {
+        for (let key in changesToAddOrModify) {
+          const value = changesToAddOrModify[key];
+          if ((0, import_eventiq6.isVariableOf)(value)) {
+            dispoMapStore.set(key, value.subscribe((newValue) => {
+              if (newValue === void 0) {
+                element2.style.removeProperty(key);
+                return;
+              }
+              element2.style[key] = newValue != null ? newValue : "";
+            }));
+            continue;
+          }
+          dispoMapStore.delete(key);
+          if (value === void 0) {
+            element2.style.removeProperty(key);
+            continue;
+          }
+          element2.style[key] = value != null ? value : "";
+        }
+      }
+    }));
     return disposables;
   });
 }
@@ -1718,7 +1773,7 @@ function applyDataset(element2, lifecycle, dataset) {
   if (!dataset) {
     return;
   }
-  if (!(0, import_eventiq5.isVariableOf)(dataset)) {
+  if (!(0, import_eventiq6.isVariableOf)(dataset)) {
     for (let key in dataset) {
       element2.dataset[key] = dataset[key];
     }
@@ -1744,7 +1799,7 @@ function applyOnMount(element2, lifecycle, onMount) {
   if (!onMount) {
     return;
   }
-  if (!(0, import_eventiq5.isVariableOf)(onMount)) {
+  if (!(0, import_eventiq6.isVariableOf)(onMount)) {
     lifecycle.subscribeDisposable((active) => {
       var _a;
       return active ? createDisposable((_a = onMount.call(element2)) != null ? _a : emptyDisposable) : emptyDisposable;
@@ -1760,7 +1815,7 @@ function applyProperty(element2, lifecycle, key, value) {
   if (value === void 0) {
     return;
   }
-  if (!(0, import_eventiq5.isVariableOf)(value)) {
+  if (!(0, import_eventiq6.isVariableOf)(value)) {
     element2[key] = value;
     return;
   }
@@ -1772,7 +1827,7 @@ function applyParent(element2, lifecycle, parent) {
   if (!parent) {
     return;
   }
-  if (!(0, import_eventiq5.isVariableOf)(parent)) {
+  if (!(0, import_eventiq6.isVariableOf)(parent)) {
     parent.appendChild(element2);
     return;
   }
@@ -1811,18 +1866,18 @@ function listenObjectKVChanges(variable, handler) {
 runMutationObserver();
 
 // src/components/theme-style.ts
-var import_eventiq6 = require("@tioniq/eventiq");
-var theme = new import_eventiq6.Vary("dark");
+var import_eventiq7 = require("@tioniq/eventiq");
+var theme = new import_eventiq7.Vary("dark");
 function getThemeStyle(forTheme) {
   forTheme = forTheme != null ? forTheme : theme;
   return {
-    normalColor: new import_eventiq6.Vary("#232323"),
-    primaryColor: new import_eventiq6.Vary("#227093"),
-    secondaryColor: new import_eventiq6.Vary("#706fd3"),
-    successColor: new import_eventiq6.Vary("#33d9b2"),
-    errorColor: new import_eventiq6.Vary("#ff5252"),
-    warningColor: new import_eventiq6.Vary("#ffda79"),
-    infoColor: new import_eventiq6.Vary("#34ace0"),
+    normalColor: new import_eventiq7.Vary("#232323"),
+    primaryColor: new import_eventiq7.Vary("#227093"),
+    secondaryColor: new import_eventiq7.Vary("#706fd3"),
+    successColor: new import_eventiq7.Vary("#33d9b2"),
+    errorColor: new import_eventiq7.Vary("#ff5252"),
+    warningColor: new import_eventiq7.Vary("#ffda79"),
+    infoColor: new import_eventiq7.Vary("#34ace0"),
     textColor: forTheme.map((t) => {
       return t === "dark" ? "#ffffff" : "#000000";
     })
@@ -2432,21 +2487,21 @@ function getFirstWord(str) {
 }
 
 // src/components/Button.tsx
-var import_eventiq8 = require("@tioniq/eventiq");
+var import_eventiq9 = require("@tioniq/eventiq");
 
 // src/variable/variable.ts
-var import_eventiq7 = require("@tioniq/eventiq");
+var import_eventiq8 = require("@tioniq/eventiq");
 function toVariable(value) {
-  if ((0, import_eventiq7.isVariableOf)(value)) {
+  if ((0, import_eventiq8.isVariableOf)(value)) {
     return value;
   }
-  return (0, import_eventiq7.createConst)(value != null ? value : null);
+  return (0, import_eventiq8.createConst)(value != null ? value : null);
 }
 function toDefinedVariable(value, defaultValue) {
-  if ((0, import_eventiq7.isVariableOf)(value)) {
+  if ((0, import_eventiq8.isVariableOf)(value)) {
     return value.map((v) => v != null ? v : defaultValue);
   }
-  return (0, import_eventiq7.createConst)(value != null ? value : defaultValue);
+  return (0, import_eventiq8.createConst)(value != null ? value : defaultValue);
 }
 
 // src/components/button-styles.ts
@@ -2522,8 +2577,8 @@ function Button(props) {
   const variant = toDefinedVariable(props.variant, "normal");
   const appearance = toDefinedVariable(props.appearance, "normal");
   const size = toDefinedVariable(props.size, "normal");
-  const classes = (0, import_eventiq8.combine)(
-    (0, import_eventiq8.createConst)(buttonStyles.button),
+  const classes = (0, import_eventiq9.combine)(
+    (0, import_eventiq9.createConst)(buttonStyles.button),
     appearance.map((a2) => a2 === "ghost" ? buttonStyles.buttonGhost : ""),
     size.map((s2) => {
       var _a;
@@ -2532,7 +2587,7 @@ function Button(props) {
   );
   const variantColor = variant.switchMap((v) => themeStyle2[`${v}Color`]);
   const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
-  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : (0, import_eventiq8.createConst)("transparent"));
+  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : (0, import_eventiq9.createConst)("transparent"));
   const borderColor = variantColor;
   const textColor = appearance.switchMap((a2) => {
     switch (a2) {
@@ -2623,6 +2678,7 @@ var jsxDEV = renderJsx;
   addStyles,
   addTagModifier,
   address,
+  applyClasses,
   applyModification,
   area,
   article,

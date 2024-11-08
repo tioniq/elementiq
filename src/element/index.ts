@@ -1,13 +1,6 @@
-import {
-  ElementController,
-  ElementDataset,
-  ElementOptions,
-  ElementStyle,
-  ElementValue
-} from "@/types/element.ts";
+import { ElementController, ElementDataset, ElementOptions, ElementStyle, ElementValue } from "@/types/element.ts";
 import { domListenKey, runMutationObserver } from "@/lifecycle/index.ts";
 import { getObjectValuesChanges, StringArrayKeyOf } from "@/diff/object.ts";
-import { getArrayChanges } from "@/diff/array.ts";
 import {
   createDisposiq,
   DisposableMapStore,
@@ -21,10 +14,10 @@ import { applyModification } from "./modifier.ts";
 import { useController } from "@/controller/index.ts";
 import { applyChildren } from "@/element/children.ts";
 import { applyContext } from "@/element/context.ts";
+import { applyClasses } from "@/element/classes.js";
 
 const propsKey = "_elemiqProps"
 const noProps = Object.freeze({})
-const emptyStringArray: string[] = []
 
 declare global {
   interface HTMLElement {
@@ -125,49 +118,35 @@ function createLifecycle(element: HTMLElement): Var<boolean> {
   }, () => element.isConnected)
 }
 
-function applyClasses(element: HTMLElement, lifecycle: Var<boolean>, classes: VarOrVal<string[]>) {
-  if (!classes) {
-    return
-  }
-  if (!isVariableOf<string[]>(classes)) {
-    element.classList.add(...classes.filter(c => !!c))
-    return
-  }
-  let previousClasses: string[] = emptyStringArray
-  lifecycle.subscribeDisposable(active => {
-    return !active
-      ? emptyDisposable
-      : classes.subscribe(newClasses => {
-        if (!Array.isArray(newClasses) || newClasses.length === 0) {
-          if (previousClasses.length === 0) {
-            return
-          }
-          for (let i = 0; i < previousClasses.length; ++i) {
-            element.classList.remove(previousClasses[i])
-          }
-          previousClasses = emptyStringArray
-          return
-        }
-        const newValues = [...newClasses.filter(c => !!c)]
-        if (previousClasses.length === 0) {
-          element.classList.add.apply(element.classList, newValues)
-          previousClasses = newValues
-          return
-        }
-        const changes = getArrayChanges(previousClasses, newValues)
-        for (let i = 0; i < changes.remove.length; ++i) {
-          element.classList.remove(changes.remove[i].item)
-        }
-        for (let i = 0; i < changes.add.length; ++i) {
-          element.classList.add(changes.add[i].item)
-        }
-        previousClasses = newValues
-      });
-  })
-}
-
 function applyStyle(element: HTMLElement, lifecycle: Var<boolean>, style: VarOrVal<ElementStyle>) {
   if (!style) {
+    return
+  }
+  if (!isVariableOf<ElementStyle>(style)) {
+    let styleKey: keyof ElementStyle & string
+    for (styleKey in style) {
+      const value = style[styleKey]
+      if (!isVariableOf<string | undefined>(value)) {
+        if (value === undefined) {
+          element.style.removeProperty(styleKey)
+          continue
+        }
+        element.style[styleKey] = value ?? ""
+        continue
+      }
+      lifecycle.subscribeDisposable(active => {
+        if (!active) {
+          return emptyDisposable
+        }
+        return value.subscribe(newValue => {
+          if (newValue === undefined) {
+            element.style.removeProperty(styleKey)
+            return
+          }
+          element.style[styleKey] = newValue ?? ""
+        })
+      })
+    }
     return
   }
   lifecycle.subscribeDisposable(active => {
@@ -175,59 +154,37 @@ function applyStyle(element: HTMLElement, lifecycle: Var<boolean>, style: VarOrV
       return emptyDisposable;
     }
     const disposables = new DisposableStore()
-    if (isVariableOf<ElementStyle>(style)) {
-      const dispoMapStore = new DisposableMapStore<string>()
-      disposables.add(dispoMapStore)
-      disposables.add(listenObjectKVChanges(style, (keysToDelete, changesToAddOrModify) => {
-        if (keysToDelete !== null) {
-          for (let key of keysToDelete) {
-            element.style.removeProperty(key)
-            dispoMapStore.delete(key)
-          }
+    const dispoMapStore = new DisposableMapStore<string>()
+    disposables.add(dispoMapStore)
+    disposables.add(listenObjectKVChanges(style, (keysToDelete, changesToAddOrModify) => {
+      if (keysToDelete !== null) {
+        for (let key of keysToDelete) {
+          element.style.removeProperty(key)
+          dispoMapStore.delete(key)
         }
-        if (changesToAddOrModify !== null) {
-          for (let key in changesToAddOrModify) {
-            const value = changesToAddOrModify[key]
-            if (isVariableOf<string | undefined>(value)) {
-              dispoMapStore.set(key, value.subscribe(newValue => {
-                if (newValue === undefined) {
-                  element.style.removeProperty(key)
-                  return
-                }
-                element.style[key] = newValue ?? ""
-              }))
-              continue
-            }
-            dispoMapStore.delete(key)
-            if (value === undefined) {
-              element.style.removeProperty(key)
-              continue
-            }
-            element.style[key] = value ?? ""
-          }
-        }
-      }))
-    } else {
-      let styleKey: keyof ElementStyle & string
-      for (styleKey in style) {
-        const value = style[styleKey]
-        if (isVariableOf<string | undefined>(value)) {
-          disposables.add(value.subscribe(newValue => {
-            if (newValue === undefined) {
-              element.style.removeProperty(styleKey)
-              return
-            }
-            element.style[styleKey] = newValue ?? ""
-          }))
-          continue
-        }
-        if (value === undefined) {
-          element.style.removeProperty(styleKey)
-          continue
-        }
-        element.style[styleKey] = value ?? ""
       }
-    }
+      if (changesToAddOrModify !== null) {
+        for (let key in changesToAddOrModify) {
+          const value = changesToAddOrModify[key]
+          if (isVariableOf<string | undefined>(value)) {
+            dispoMapStore.set(key, value.subscribe(newValue => {
+              if (newValue === undefined) {
+                element.style.removeProperty(key)
+                return
+              }
+              element.style[key] = newValue ?? ""
+            }))
+            continue
+          }
+          dispoMapStore.delete(key)
+          if (value === undefined) {
+            element.style.removeProperty(key)
+            continue
+          }
+          element.style[key] = value ?? ""
+        }
+      }
+    }))
     return disposables
   })
 }

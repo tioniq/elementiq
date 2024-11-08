@@ -7,6 +7,10 @@ export function applyChildren(element: HTMLElement, lifecycle: Var<boolean>, chi
   if (!children) {
     return
   }
+  if (!isVariableOf<ElementChildren>(children)) {
+    setChildrenStatically(children, element, lifecycle)
+    return
+  }
   lifecycle.subscribeDisposable(active => {
     if (!active) {
       return emptyDisposable;
@@ -171,6 +175,51 @@ function setChildren(children: Children, element: HTMLElement, mark: Node | null
       element.removeChild(node)
     }
   }
+}
+
+function setChildrenStatically(children: Children, element: HTMLElement, lifecycle: Var<boolean>): void {
+  if (!Array.isArray(children)) {
+    const node = createNode(children as ElementChild)
+    element.appendChild(node)
+    return
+  }
+  if (children.length === 0) {
+    return
+  }
+  for (let i = 0; i < children.length; i++) {
+    const child = children[i]
+    if (!isVariableOf<Children>(child)) {
+      setChildrenStatically(child, element, lifecycle)
+      continue
+    }
+    const slot = createEmptyNode()
+    element.appendChild(slot)
+
+    lifecycle.subscribeDisposable(active => {
+      if (!active) {
+        return emptyDisposable
+      }
+      let controller: ChildController | null = null
+      const disposables = new DisposableStore()
+      disposables.add(child.subscribe(updateChildren))
+      disposables.add(new DisposableAction(() => {
+        if (controller) {
+          controller.remove()
+          controller = null
+        }
+      }))
+      return disposables;
+
+      function updateChildren(newChildrenOpts: ElementChildren) {
+        if (!controller) {
+          controller = setChildren(newChildrenOpts, element, slot)
+          return
+        }
+        controller = controller.replace(newChildrenOpts)
+      }
+    })
+  }
+  return
 }
 
 function createNode(value: ElementChild): Node {

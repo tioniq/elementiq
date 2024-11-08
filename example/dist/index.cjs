@@ -2242,86 +2242,6 @@ function getObjectValuesChanges(oldRecord, newRecord, equalityComparer) {
   }
   return [keysToDelete, toAddOrChange];
 }
-function getArrayChanges(oldArray, newArray) {
-  const oldArrayLength = oldArray.length;
-  const newArrayLength = newArray.length;
-  const resultAdd = [];
-  const resultRemove = [];
-  const resultSwap = [];
-  const result = {
-    add: resultAdd,
-    remove: resultRemove,
-    swap: resultSwap
-  };
-  const newArrayData = newArray.map((item) => ({
-    item,
-    oldIndex: -1,
-    moveIndex: -1
-  }));
-  for (let i2 = 0; i2 < oldArrayLength; i2++) {
-    const oldItem = oldArray[i2];
-    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
-    if (newItemDataIndex === -1) {
-      resultRemove.push({
-        item: oldItem,
-        index: i2
-      });
-      continue;
-    }
-    const newData = newArrayData[newItemDataIndex];
-    newData.oldIndex = i2;
-    newData.moveIndex = i2;
-  }
-  const removedCount = resultRemove.length;
-  if (removedCount > 0) {
-    for (let i2 = 0; i2 < newArrayLength; ++i2) {
-      const newItemData = newArrayData[i2];
-      if (newItemData.oldIndex === -1) {
-        continue;
-      }
-      let removesCount = 0;
-      for (let j = 0; j < removedCount; ++j) {
-        if (resultRemove[j].index < newItemData.oldIndex) {
-          removesCount++;
-        } else {
-          break;
-        }
-      }
-      newItemData.moveIndex -= removesCount;
-    }
-  }
-  let addCounter = 0;
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      resultAdd.push({
-        item: newItemData.item,
-        index: i2
-      });
-      addCounter++;
-      continue;
-    }
-    newArrayData[i2].moveIndex += addCounter;
-  }
-  for (let i2 = 0; i2 < newArrayLength; i2++) {
-    const newItemData = newArrayData[i2];
-    if (newItemData.oldIndex === -1) {
-      continue;
-    }
-    if (i2 === newItemData.moveIndex) {
-      continue;
-    }
-    const swapWith = newArrayData[newItemData.moveIndex];
-    resultSwap.push({
-      item: newItemData.item,
-      index: newItemData.moveIndex,
-      newIndex: i2
-    });
-    swapWith.moveIndex = newItemData.moveIndex;
-    newItemData.moveIndex = i2;
-  }
-  return result;
-}
 var __async2 = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
     var fulfilled = (value) => {
@@ -3066,8 +2986,92 @@ function useController(controller, handler) {
     return value;
   });
 }
+function getArrayChanges(oldArray, newArray) {
+  const oldArrayLength = oldArray.length;
+  const newArrayLength = newArray.length;
+  const resultAdd = [];
+  const resultRemove = [];
+  const resultSwap = [];
+  const result = {
+    add: resultAdd,
+    remove: resultRemove,
+    swap: resultSwap
+  };
+  const newArrayData = newArray.map((item) => ({
+    item,
+    oldIndex: -1,
+    moveIndex: -1
+  }));
+  for (let i2 = 0; i2 < oldArrayLength; i2++) {
+    const oldItem = oldArray[i2];
+    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
+    if (newItemDataIndex === -1) {
+      resultRemove.push({
+        item: oldItem,
+        index: i2
+      });
+      continue;
+    }
+    const newData = newArrayData[newItemDataIndex];
+    newData.oldIndex = i2;
+    newData.moveIndex = i2;
+  }
+  const removedCount = resultRemove.length;
+  if (removedCount > 0) {
+    for (let i2 = 0; i2 < newArrayLength; ++i2) {
+      const newItemData = newArrayData[i2];
+      if (newItemData.oldIndex === -1) {
+        continue;
+      }
+      let removesCount = 0;
+      for (let j = 0; j < removedCount; ++j) {
+        if (resultRemove[j].index < newItemData.oldIndex) {
+          removesCount++;
+        } else {
+          break;
+        }
+      }
+      newItemData.moveIndex -= removesCount;
+    }
+  }
+  let addCounter = 0;
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      resultAdd.push({
+        item: newItemData.item,
+        index: i2
+      });
+      addCounter++;
+      continue;
+    }
+    newArrayData[i2].moveIndex += addCounter;
+  }
+  for (let i2 = 0; i2 < newArrayLength; i2++) {
+    const newItemData = newArrayData[i2];
+    if (newItemData.oldIndex === -1) {
+      continue;
+    }
+    if (i2 === newItemData.moveIndex) {
+      continue;
+    }
+    const swapWith = newArrayData[newItemData.moveIndex];
+    resultSwap.push({
+      item: newItemData.item,
+      index: newItemData.moveIndex,
+      newIndex: i2
+    });
+    swapWith.moveIndex = newItemData.moveIndex;
+    newItemData.moveIndex = i2;
+  }
+  return result;
+}
 function applyChildren(element2, lifecycle, children) {
   if (!children) {
+    return;
+  }
+  if (!isVariableOf(children)) {
+    setChildrenStatically(children, element2, lifecycle);
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -3224,6 +3228,48 @@ function setChildren(children, element2, mark2) {
       element2.removeChild(node);
     }
   };
+}
+function setChildrenStatically(children, element2, lifecycle) {
+  if (!Array.isArray(children)) {
+    const node = createNode(children);
+    element2.appendChild(node);
+    return;
+  }
+  if (children.length === 0) {
+    return;
+  }
+  for (let i2 = 0; i2 < children.length; i2++) {
+    const child = children[i2];
+    if (!isVariableOf(child)) {
+      setChildrenStatically(child, element2, lifecycle);
+      continue;
+    }
+    const slot2 = createEmptyNode();
+    element2.appendChild(slot2);
+    lifecycle.subscribeDisposable((active) => {
+      if (!active) {
+        return emptyDisposable2;
+      }
+      let controller = null;
+      const disposables = new DisposableStore2();
+      disposables.add(child.subscribe(updateChildren));
+      disposables.add(new DisposableAction2(() => {
+        if (controller) {
+          controller.remove();
+          controller = null;
+        }
+      }));
+      return disposables;
+      function updateChildren(newChildrenOpts) {
+        if (!controller) {
+          controller = setChildren(newChildrenOpts, element2, slot2);
+          return;
+        }
+        controller = controller.replace(newChildrenOpts);
+      }
+    });
+  }
+  return;
 }
 function createNode(value) {
   if (!value) {
@@ -3434,9 +3480,45 @@ function createProvider(context, value) {
 function getDataKey(key) {
   return "elCtx" + capitalize(key.replace("-", ""));
 }
+var emptyStringArray = [];
+function applyClasses(element2, lifecycle, classes) {
+  if (!classes) {
+    return;
+  }
+  if (!isVariableOf(classes)) {
+    element2.classList.add(...classes.filter((c) => !!c));
+    return;
+  }
+  let previousClasses = emptyStringArray;
+  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable2 : classes.subscribe((newClasses) => {
+    if (!Array.isArray(newClasses) || newClasses.length === 0) {
+      if (previousClasses.length === 0) {
+        return;
+      }
+      for (let i2 = 0; i2 < previousClasses.length; ++i2) {
+        element2.classList.remove(previousClasses[i2]);
+      }
+      previousClasses = emptyStringArray;
+      return;
+    }
+    const newValues = [...newClasses.filter((c) => !!c)];
+    if (previousClasses.length === 0) {
+      element2.classList.add.apply(element2.classList, newValues);
+      previousClasses = newValues;
+      return;
+    }
+    const changes = getArrayChanges(previousClasses, newValues);
+    for (let i2 = 0; i2 < changes.remove.length; ++i2) {
+      element2.classList.remove(changes.remove[i2].item);
+    }
+    for (let i2 = 0; i2 < changes.add.length; ++i2) {
+      element2.classList.add(changes.add[i2].item);
+    }
+    previousClasses = newValues;
+  }));
+}
 var propsKey = "_elemiqProps";
 var noProps = Object.freeze({});
-var emptyStringArray = [];
 function element(tag, elementOptions) {
   const element2 = document.createElement(tag);
   if (elementOptions == void 0) {
@@ -3527,46 +3609,35 @@ function createLifecycle(element2) {
     });
   }, () => element2.isConnected);
 }
-function applyClasses(element2, lifecycle, classes) {
-  if (!classes) {
-    return;
-  }
-  if (!isVariableOf(classes)) {
-    element2.classList.add(...classes.filter((c) => !!c));
-    return;
-  }
-  let previousClasses = emptyStringArray;
-  lifecycle.subscribeDisposable((active) => {
-    return !active ? emptyDisposable2 : classes.subscribe((newClasses) => {
-      if (!Array.isArray(newClasses) || newClasses.length === 0) {
-        if (previousClasses.length === 0) {
-          return;
-        }
-        for (let i2 = 0; i2 < previousClasses.length; ++i2) {
-          element2.classList.remove(previousClasses[i2]);
-        }
-        previousClasses = emptyStringArray;
-        return;
-      }
-      const newValues = [...newClasses.filter((c) => !!c)];
-      if (previousClasses.length === 0) {
-        element2.classList.add.apply(element2.classList, newValues);
-        previousClasses = newValues;
-        return;
-      }
-      const changes = getArrayChanges(previousClasses, newValues);
-      for (let i2 = 0; i2 < changes.remove.length; ++i2) {
-        element2.classList.remove(changes.remove[i2].item);
-      }
-      for (let i2 = 0; i2 < changes.add.length; ++i2) {
-        element2.classList.add(changes.add[i2].item);
-      }
-      previousClasses = newValues;
-    });
-  });
-}
 function applyStyle(element2, lifecycle, style2) {
   if (!style2) {
+    return;
+  }
+  if (!isVariableOf(style2)) {
+    let styleKey;
+    for (styleKey in style2) {
+      const value = style2[styleKey];
+      if (!isVariableOf(value)) {
+        if (value === void 0) {
+          element2.style.removeProperty(styleKey);
+          continue;
+        }
+        element2.style[styleKey] = value != null ? value : "";
+        continue;
+      }
+      lifecycle.subscribeDisposable((active) => {
+        if (!active) {
+          return emptyDisposable2;
+        }
+        return value.subscribe((newValue) => {
+          if (newValue === void 0) {
+            element2.style.removeProperty(styleKey);
+            return;
+          }
+          element2.style[styleKey] = newValue != null ? newValue : "";
+        });
+      });
+    }
     return;
   }
   lifecycle.subscribeDisposable((active) => {
@@ -3574,59 +3645,37 @@ function applyStyle(element2, lifecycle, style2) {
       return emptyDisposable2;
     }
     const disposables = new DisposableStore2();
-    if (isVariableOf(style2)) {
-      const dispoMapStore = new DisposableMapStore();
-      disposables.add(dispoMapStore);
-      disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
-        if (keysToDelete !== null) {
-          for (let key of keysToDelete) {
-            element2.style.removeProperty(key);
-            dispoMapStore.delete(key);
-          }
+    const dispoMapStore = new DisposableMapStore();
+    disposables.add(dispoMapStore);
+    disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
+      if (keysToDelete !== null) {
+        for (let key of keysToDelete) {
+          element2.style.removeProperty(key);
+          dispoMapStore.delete(key);
         }
-        if (changesToAddOrModify !== null) {
-          for (let key in changesToAddOrModify) {
-            const value = changesToAddOrModify[key];
-            if (isVariableOf(value)) {
-              dispoMapStore.set(key, value.subscribe((newValue) => {
-                if (newValue === void 0) {
-                  element2.style.removeProperty(key);
-                  return;
-                }
-                element2.style[key] = newValue != null ? newValue : "";
-              }));
-              continue;
-            }
-            dispoMapStore.delete(key);
-            if (value === void 0) {
-              element2.style.removeProperty(key);
-              continue;
-            }
-            element2.style[key] = value != null ? value : "";
-          }
-        }
-      }));
-    } else {
-      let styleKey;
-      for (styleKey in style2) {
-        const value = style2[styleKey];
-        if (isVariableOf(value)) {
-          disposables.add(value.subscribe((newValue) => {
-            if (newValue === void 0) {
-              element2.style.removeProperty(styleKey);
-              return;
-            }
-            element2.style[styleKey] = newValue != null ? newValue : "";
-          }));
-          continue;
-        }
-        if (value === void 0) {
-          element2.style.removeProperty(styleKey);
-          continue;
-        }
-        element2.style[styleKey] = value != null ? value : "";
       }
-    }
+      if (changesToAddOrModify !== null) {
+        for (let key in changesToAddOrModify) {
+          const value = changesToAddOrModify[key];
+          if (isVariableOf(value)) {
+            dispoMapStore.set(key, value.subscribe((newValue) => {
+              if (newValue === void 0) {
+                element2.style.removeProperty(key);
+                return;
+              }
+              element2.style[key] = newValue != null ? newValue : "";
+            }));
+            continue;
+          }
+          dispoMapStore.delete(key);
+          if (value === void 0) {
+            element2.style.removeProperty(key);
+            continue;
+          }
+          element2.style[key] = value != null ? value : "";
+        }
+      }
+    }));
     return disposables;
   });
 }
@@ -3737,7 +3786,6 @@ function getThemeStyle(forTheme) {
     warningColor: new MutableVariable("#ffda79"),
     infoColor: new MutableVariable("#34ace0"),
     textColor: forTheme.map((t) => {
-      console.debug("Getting text color for theme", t);
       return t === "dark" ? "#ffffff" : "#000000";
     })
   };
