@@ -141,6 +141,9 @@ function setDynamicArrayChild(
     insertAfter(slot, previousSlot)
     previousSlot = slot
     slots[i] = slot
+  }
+  for (let i = 0; i < children.length; i++) {
+    const slot = slots[i]
     const child = children[i]
     const controller = setDynamicChildren(child, element, slot)
     controllers.push(controller)
