@@ -1000,6 +1000,9 @@ function setDynamicArrayChild(child, element2, mark2) {
     insertAfter(slot2, previousSlot);
     previousSlot = slot2;
     slots[i2] = slot2;
+  }
+  for (let i2 = 0; i2 < children.length; i2++) {
+    const slot2 = slots[i2];
     const child2 = children[i2];
     const controller = setDynamicChildren(child2, element2, slot2);
     controllers.push(controller);
