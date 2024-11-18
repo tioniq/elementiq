@@ -53,7 +53,7 @@
     "./dist": "./dist"
   },
   "dependencies": {
-    "@tioniq/eventiq": "^1.1.4"
+    "@tioniq/eventiq": "^1.1.5"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
