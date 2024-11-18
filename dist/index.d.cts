@@ -1,8 +1,23 @@
-import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
 import * as _tioniq_eventiq from '@tioniq/eventiq';
 import { Var, Variable, VarOrVal, Vary } from '@tioniq/eventiq';
+import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
 
-type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends (<T>() => T extends Y ? 1 : 2) ? A : B;
+type ContextType = object;
+type Context<T extends ContextType> = {};
+type ContextValue<T extends ContextType> = {
+    [P in keyof T]: T[P] extends Var<unknown> ? T[P] : Var<T[P]>;
+};
+declare function useContext<T extends ContextType>(context: Context<T>, defaultValue?: T | null): ContextValue<T>;
+declare function createContext<T extends ContextType>(key: string, defaultValue?: T | null): Context<T>;
+
+declare class AttachedToDOMEvent extends Event {
+    constructor();
+}
+declare class DetachedFromDOMEvent extends Event {
+    constructor();
+}
+
+type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? A : B;
 type WritableKeys<T> = {
     [P in keyof T]-?: IfEquals<{
         [Q in P]: T[P];
@@ -17,24 +32,9 @@ type ReadonlyKeys<T> = {
         -readonly [Q in P]: T[P];
     }, never, P>;
 }[keyof T];
-type ObjectWritableProps<T extends Record<string, any>> = {
+type ObjectWritableProps<T extends object> = {
     [P in WritableKeys<T>]: T[P];
 };
-
-declare class AttachedToDOMEvent extends Event {
-    constructor();
-}
-declare class DetachedFromDOMEvent extends Event {
-    constructor();
-}
-
-type ContextType = Record<string, any>;
-type Context<T extends ContextType> = {};
-type ContextValue<T extends ContextType> = {
-    [P in keyof T]: T[P] extends Var<unknown> ? T[P] : Var<T[P]>;
-};
-declare function useContext<T extends ContextType>(context: Context<T>, defaultValue?: T | null): ContextValue<T>;
-declare function createContext<T extends ContextType>(key: string, defaultValue?: T | null): Context<T>;
 
 interface MissingAttributes {
     ariaControls?: string | null;
@@ -42,7 +42,7 @@ interface MissingAttributes {
     role?: string | null;
 }
 type NonUndefined<T> = T extends undefined ? never : T;
-type ObjectValuesVariableOrValue<Type extends Record<string, any>> = {
+type ObjectValuesVariableOrValue<Type extends Record<string, unknown>> = {
     [P in keyof Type]: Type[P] | Variable<Type[P]> | Variable<NonUndefined<Type[P]>>;
 };
 type ElementChild = Node | string | undefined | null | boolean;
@@ -84,15 +84,18 @@ type EventKeywordsArray = [
     "policy"
 ];
 type Split<S extends string, K extends string> = S extends `${infer Prefix}${K}${infer Suffix}` ? [Prefix, K, Suffix] : never;
-type SplitAtFirstKeyword<S extends string, Keywords extends readonly string[]> = Keywords extends [infer FirstKeyword extends string, ...infer RestKeywords extends string[]] ? Split<S, FirstKeyword> extends never ? SplitAtFirstKeyword<S, RestKeywords> : Split<S, FirstKeyword> : [S];
+type SplitAtFirstKeyword<S extends string, Keywords extends readonly string[]> = Keywords extends [
+    infer FirstKeyword extends string,
+    ...infer RestKeywords extends string[]
+] ? Split<S, FirstKeyword> extends never ? SplitAtFirstKeyword<S, RestKeywords> : Split<S, FirstKeyword> : [S];
 type JoinCapitalized<T extends string[], D extends string> = T extends [] ? never : T extends [infer F extends string] ? Capitalize<F> : T extends [infer F, ...infer R] ? F extends string ? `${Capitalize<F>}${D}${JoinCapitalized<Extract<R, string[]>, D>}` : never : string;
 type KeywordSplitter<Event extends string> = SplitAtFirstKeyword<Event, EventKeywordsArray> extends infer Result ? Result extends string[] ? JoinCapitalized<Result, ""> : Capitalize<Event> : never;
 type MapEventName<Event extends string> = `on${KeywordSplitter<Event>}`;
 type MappedEvents<T, ThisArg> = {
-    [P in Extract<keyof T, string> as MapEventName<P>]?: (this: ThisArg, ev: T[P]) => any;
+    [P in Extract<keyof T, string> as MapEventName<P>]?: (this: ThisArg, ev: T[P]) => unknown;
 };
 type ElementProps<T extends HTMLElement = HTMLElement> = {
-    [P in WritableKeys<T> as (T[P] extends (string | number | boolean) ? P : never)]?: T[P];
+    [P in WritableKeys<T> as T[P] extends string | number | boolean ? P : never]?: T[P];
 } & MissingAttributes & {
     classes?: string[];
     style?: ElementStyle;
@@ -100,22 +103,22 @@ type ElementProps<T extends HTMLElement = HTMLElement> = {
 } & {
     dataset?: ElementDataset;
 } & MappedEvents<HTMLElementEventMap, T> & {
-    modifierData?: any;
+    modifierData?: unknown;
 } & {
-    onAttachedToDom?: (this: T, ev: AttachedToDOMEvent) => any;
-    onDetachedFromDom?: (this: T, ev: DetachedFromDOMEvent) => any;
+    onAttachedToDom?: (this: T, ev: AttachedToDOMEvent) => void;
+    onDetachedFromDom?: (this: T, ev: DetachedFromDOMEvent) => void;
 } & {
-    onMount?: (this: T) => DisposableLike | void;
+    onMount?: (this: T) => DisposableLike | undefined;
 };
 type ElementController<T extends HTMLElement = HTMLElement> = {
-    [P in keyof T as (T[P] extends Function ? P : never)]: T[P];
+    [P in keyof T as T[P] extends Function ? P : never]: T[P];
 };
 type ElementOptions<T extends HTMLElement = HTMLElement> = ObjectValuesVariableOrValue<ElementProps<T>> & {
     parent?: ParentNode;
     controller?: ElementController<T>;
-    context?: ContextValue<any>;
+    context?: ContextValue<ContextType>;
 };
-type StubElement = Symbol;
+type StubElement = symbol;
 type ElementValue<T extends HTMLElement = HTMLElement> = T;
 
 type StyleDeclaration = Partial<CSSStyleDeclaration>;
@@ -127,7 +130,7 @@ type ClassNameMap<ClassKey extends string = string> = Record<ClassKey, string>;
 
 declare global {
     interface HTMLElement {
-        _elemiqProps: any;
+        _elemiqProps: unknown;
     }
 }
 declare function element<K extends keyof HTMLElementTagNameMap>(tag: K, elementOptions?: ElementOptions<HTMLElementTagNameMap[K]>): ElementValue<HTMLElementTagNameMap[K]>;
@@ -180,9 +183,7 @@ interface ThemeContextValue {
 declare function createThemeContext(): Context<ThemeContextValue>;
 declare const ThemeContext: Context<ThemeContextValue>;
 
-interface Modifier {
-    (element: HTMLElement, elementOptions?: ElementOptions): void;
-}
+type Modifier = (element: HTMLElement, elementOptions?: ElementOptions) => void;
 declare function addModifier(modifier: Modifier): void;
 declare function addTagModifier(tag: string, modifier: Modifier): void;
 declare function applyModification<K extends keyof HTMLElementTagNameMap, E extends HTMLElementTagNameMap[K] = HTMLElementTagNameMap[K]>(element: E, elementOptions?: ElementOptions<E>): void;
@@ -427,10 +428,10 @@ declare const elements: {
 
 declare function createController<T extends object>(): T;
 declare function useController<T>(controller: T, handler: T): void;
-declare function useFunctionController<T>(controller: T, handler: (key: keyof T, ...args: any[]) => any): void;
+declare function useFunctionController<T>(controller: T, handler: (key: keyof T, ...args: unknown[]) => unknown): void;
 
-type FunctionComponent<P = {}> = (props: P) => ElementValue;
-interface ClassComponent<P = {}> {
+type FunctionComponent<P = object> = (props: P) => ElementValue;
+interface ClassComponent<P = object> {
     new (props: P): ClassComponent;
     render(): ElementValue;
 }
@@ -517,4 +518,17 @@ declare function renderJsx<K extends keyof HTMLElementTagNameMap>(tag: K, props:
 
 declare function applyClasses(element: HTMLElement, lifecycle: Var<boolean>, classes: VarOrVal<string[]>): void;
 
-export { Button, type ClassComponent, type ClassNameMap, type Context, ContextProvider, type ContextType, type ContextValue, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type Theme, ThemeContext, type ThemeContextValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyClasses, applyModification, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createContext, createController, createThemeContext, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, getThemeStyle, getThemeStyleFromContext, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, theme, themeStyle, time, title, tr, track, u, ul, useContext, useController, useFunctionController, var_, video, wbr };
+declare function applyStyle(element: HTMLElement, lifecycle: Var<boolean>, style: VarOrVal<ElementStyle>): void;
+
+declare function applyDataset(element: HTMLElement, lifecycle: Var<boolean>, dataset: VarOrVal<ElementDataset>): void;
+
+declare function applyController<T extends HTMLElement>(element: T, controller: ElementController<T>): void;
+
+declare function applyParent(element: HTMLElement, lifecycle: Var<boolean>, parent: VarOrVal<ParentNode | undefined>): void;
+
+declare function applyProperty<T extends keyof HTMLElementTagNameMap, K extends keyof HTMLElementTagNameMap[T]>(element: HTMLElementTagNameMap[T], lifecycle: Var<boolean>, key: K, value: VarOrVal<HTMLElementTagNameMap[T][K]>): void;
+
+type OnMountHandler = (this: HTMLElement) => IDisposable | undefined;
+declare function applyOnMount(element: HTMLElement, lifecycle: Var<boolean>, onMount: VarOrVal<OnMountHandler>): void;
+
+export { Button, type ClassComponent, type ClassNameMap, type Context, ContextProvider, type ContextType, type ContextValue, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type Theme, ThemeContext, type ThemeContextValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyClasses, applyController, applyDataset, applyModification, applyOnMount, applyParent, applyProperty, applyStyle, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createContext, createController, createThemeContext, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, getThemeStyle, getThemeStyleFromContext, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, theme, themeStyle, time, title, tr, track, u, ul, useContext, useController, useFunctionController, var_, video, wbr };

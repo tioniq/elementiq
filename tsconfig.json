@@ -17,8 +17,6 @@
     "jsxImportSource": "@tioniq/elementiq",
     "rootDir": "./"
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "exclude": ["dist"]
 }

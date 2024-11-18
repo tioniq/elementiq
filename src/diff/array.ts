@@ -20,7 +20,10 @@ export interface ArrayChanges<T> {
   swap: ArraySwapChange<T>[]
 }
 
-export function getArrayChanges<T>(oldArray: T[], newArray: T[]): ArrayChanges<T> {
+export function getArrayChanges<T>(
+  oldArray: T[],
+  newArray: T[],
+): ArrayChanges<T> {
   const oldArrayLength = oldArray.length
   const newArrayLength = newArray.length
   const resultAdd: ArrayAddChange<T>[] = []
@@ -35,14 +38,16 @@ export function getArrayChanges<T>(oldArray: T[], newArray: T[]): ArrayChanges<T
     item: T
     oldIndex: number
     moveIndex: number
-  }[] = newArray.map(item => ({
+  }[] = newArray.map((item) => ({
     item: item,
     oldIndex: -1,
-    moveIndex: -1
+    moveIndex: -1,
   }))
   for (let i = 0; i < oldArrayLength; i++) {
     const oldItem = oldArray[i]
-    const newItemDataIndex = newArrayData.findIndex(data => data.oldIndex === -1 && data.item === oldItem)
+    const newItemDataIndex = newArrayData.findIndex(
+      (data) => data.oldIndex === -1 && data.item === oldItem,
+    )
     if (newItemDataIndex === -1) {
       resultRemove.push({
         item: oldItem,
@@ -50,7 +55,7 @@ export function getArrayChanges<T>(oldArray: T[], newArray: T[]): ArrayChanges<T
       })
       continue
     }
-    const newData = newArrayData[newItemDataIndex];
+    const newData = newArrayData[newItemDataIndex]
     newData.oldIndex = i
     newData.moveIndex = i
   }

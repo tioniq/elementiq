@@ -1,4 +1,4 @@
-import { makeClassStyles } from "@/styles/index.js";
+import { makeClassStyles } from "@/styles/index.ts"
 
 export const buttonStyles = makeClassStyles({
   button: {
@@ -50,6 +50,6 @@ export const buttonStyles = makeClassStyles({
   },
   buttonGhost: {},
   "buttonGhost:hover": {
-    backgroundColor: "#282828"
+    backgroundColor: "#282828",
   },
 })

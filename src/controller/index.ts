@@ -1,6 +1,6 @@
 const setHandler = Symbol("setHandler")
 
-type ControllerHandler<T> = <K extends keyof T>(key: K) => any
+type ControllerHandler<T> = <K extends keyof T>(key: K) => unknown
 
 interface ControllerProxy<T> {
   [setHandler](handler: ControllerHandler<T>): void
@@ -23,7 +23,7 @@ export function createController<T extends object>(): T {
         throw new Error("Controller is not in use")
       }
       return ref(p as keyof T)
-    }
+    },
   })
 }
 
@@ -31,24 +31,27 @@ export function useController<T>(controller: T, handler: T): void {
   if (!controller) {
     return
   }
-  (controller as unknown as ControllerProxy<T>)[setHandler](((key: keyof T): any => {
-    const value = handler[key as keyof T];
-    if (value instanceof Function) {
-      return function () {
-        return value.apply(handler, arguments);
-      };
-    }
-    return value
-  }))
+  ;(controller as unknown as ControllerProxy<T>)[setHandler](
+    (key: keyof T): unknown => {
+      const value = handler[key as keyof T]
+      if (value instanceof Function) {
+        return (...args: unknown[]) => value.apply(handler, args)
+      }
+      return value
+    },
+  )
 }
 
-export function useFunctionController<T>(controller: T, handler: (key: keyof T, ...args: any[]) => any): void {
+export function useFunctionController<T>(
+  controller: T,
+  handler: (key: keyof T, ...args: unknown[]) => unknown,
+): void {
   if (!controller) {
     return
   }
-  (controller as unknown as ControllerProxy<T>)[setHandler]((key: keyof T): any => {
-    return function () {
-      return handler(key, arguments);
-    }
-  })
+  ;(controller as unknown as ControllerProxy<T>)[setHandler](
+    (key: keyof T): unknown => {
+      return (...args: unknown[]) => handler(key, args)
+    },
+  )
 }

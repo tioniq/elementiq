@@ -2151,7 +2151,7 @@ var DetachedFromDOMEvent = class extends Event {
 };
 function runMutationObserver() {
   const mutationObserver = new MutationObserver((mutations, observer) => {
-    for (let mutation of mutations) {
+    for (const mutation of mutations) {
       if (mutation.type === "childList") {
         if (mutation.addedNodes.length > 0) {
           for (let i2 = 0; i2 < mutation.addedNodes.length; ++i2) {
@@ -2202,45 +2202,6 @@ function checkAndDispatchDetachedFromDOMEvent(node) {
       }
     }
   }
-}
-function getObjectValuesChanges(oldRecord, newRecord, equalityComparer) {
-  if (!oldRecord) {
-    return [null, newRecord];
-  }
-  if (!newRecord) {
-    return [Object.keys(oldRecord), null];
-  }
-  let keysToDelete = null;
-  let toAddOrChange = null;
-  for (let key in oldRecord) {
-    if (!(key in newRecord)) {
-      if (keysToDelete === null) {
-        keysToDelete = [key];
-      } else {
-        keysToDelete.push(key);
-      }
-    }
-  }
-  equalityComparer = equalityComparer || defaultEqualityComparer;
-  for (let key in newRecord) {
-    const oldValue = oldRecord[key];
-    if (oldValue === void 0) {
-      if (toAddOrChange === null) {
-        toAddOrChange = { [key]: newRecord[key] };
-      } else {
-        toAddOrChange[key] = newRecord[key];
-      }
-      continue;
-    }
-    if (!equalityComparer(oldValue, newRecord[key], key)) {
-      if (toAddOrChange === null) {
-        toAddOrChange = { [key]: newRecord[key] };
-      } else {
-        toAddOrChange[key] = newRecord[key];
-      }
-    }
-  }
-  return [keysToDelete, toAddOrChange];
 }
 var __async2 = (__this, __arguments, generator) => {
   return new Promise((resolve, reject) => {
@@ -2890,6 +2851,10 @@ var DisposableMapStore = class extends Disposiq2 {
     this._map.clear();
   }
 };
+function addEventListener(target, type, listener, options) {
+  target.addEventListener(type, listener, options);
+  return new DisposableAction2(() => target.removeEventListener(type, listener, options));
+}
 Disposiq2.prototype.disposeWith = function(container) {
   return container.add(this);
 };
@@ -2951,41 +2916,6 @@ function applyModification(element2, elementOptions) {
     modifier(element2, elementOptions);
   }
 }
-var setHandler = Symbol("setHandler");
-function createController() {
-  let ref = void 0;
-  const obj = {};
-  return new Proxy(obj, {
-    get(target, p2, receiver) {
-      if (p2 === setHandler) {
-        return (handler) => {
-          if (ref !== void 0) {
-            console.error("Controller used multiple times");
-          }
-          ref = handler;
-        };
-      }
-      if (ref === void 0) {
-        throw new Error("Controller is not in use");
-      }
-      return ref(p2);
-    }
-  });
-}
-function useController(controller, handler) {
-  if (!controller) {
-    return;
-  }
-  controller[setHandler]((key) => {
-    const value = handler[key];
-    if (value instanceof Function) {
-      return function() {
-        return value.apply(handler, arguments);
-      };
-    }
-    return value;
-  });
-}
 function getArrayChanges(oldArray, newArray) {
   const oldArrayLength = oldArray.length;
   const newArrayLength = newArray.length;
@@ -3004,7 +2934,9 @@ function getArrayChanges(oldArray, newArray) {
   }));
   for (let i2 = 0; i2 < oldArrayLength; i2++) {
     const oldItem = oldArray[i2];
-    const newItemDataIndex = newArrayData.findIndex((data2) => data2.oldIndex === -1 && data2.item === oldItem);
+    const newItemDataIndex = newArrayData.findIndex(
+      (data2) => data2.oldIndex === -1 && data2.item === oldItem
+    );
     if (newItemDataIndex === -1) {
       resultRemove.push({
         item: oldItem,
@@ -3071,165 +3003,14 @@ function applyChildren(element2, lifecycle, children) {
     return;
   }
   if (!isVariableOf(children)) {
-    setChildrenStatically(children, element2, lifecycle);
+    setStaticChildren(children, element2, lifecycle);
     return;
   }
-  lifecycle.subscribeDisposable((active) => {
-    if (!active) {
-      return emptyDisposable2;
-    }
-    const disposables = new DisposableStore2();
-    let controller = null;
-    if (isVariableOf(children)) {
-      disposables.add(children.subscribe(updateChildren));
-    } else {
-      updateChildren(children);
-    }
-    disposables.add(new DisposableAction2(() => {
-      if (controller) {
-        controller.remove();
-        controller = null;
-      }
-    }));
-    return disposables;
-    function updateChildren(newChildrenOpts) {
-      if (!controller) {
-        controller = setChildren(newChildrenOpts, element2, null);
-        return;
-      }
-      controller = controller.replace(newChildrenOpts);
-    }
-  });
+  const slot2 = createEmptyNode();
+  element2.appendChild(slot2);
+  setVariableChild(children, element2, lifecycle, slot2);
 }
-function setChildren(children, element2, mark2) {
-  if (Array.isArray(children)) {
-    if (children.length === 0) {
-      return {
-        replace(child) {
-          return setChildren(child, element2, mark2);
-        },
-        remove() {
-        }
-      };
-    }
-    children = [...children];
-    const controllers = [];
-    const beginMark = createEmptyNode();
-    element2.insertBefore(beginMark, mark2);
-    let slots = new Array(children.length);
-    for (let i2 = 0; i2 < children.length; i2++) {
-      let slot2 = createEmptyNode();
-      element2.insertBefore(slot2, mark2);
-      slots[i2] = slot2;
-      const child = children[i2];
-      const controller = setChildren(child, element2, slot2);
-      controllers.push(controller);
-    }
-    return {
-      replace(child) {
-        if (!Array.isArray(child)) {
-          const controller = setChildren(child, element2, slots[slots.length - 1]);
-          this.remove();
-          return controller;
-        }
-        if (child.length === 0) {
-          const slot2 = createEmptyNode();
-          element2.insertBefore(slot2, slots[slot2.length - 1]);
-          this.remove();
-          return {
-            replace(child2) {
-              const controller = setChildren(child2, element2, slot2);
-              this.remove();
-              return controller;
-            },
-            remove() {
-              element2.removeChild(slot2);
-              element2.removeChild(beginMark);
-            }
-          };
-        }
-        child = [...child];
-        const changes = getArrayChanges(children, child);
-        for (let i2 = changes.remove.length - 1; i2 >= 0; --i2) {
-          const remove = changes.remove[i2];
-          controllers[remove.index].remove();
-          element2.removeChild(slots[remove.index]);
-          slots.splice(remove.index, 1);
-          controllers.splice(remove.index, 1);
-        }
-        for (let i2 = 0; i2 < changes.add.length; i2++) {
-          const add = changes.add[i2];
-          const slot2 = createEmptyNode();
-          const elementToInsertAfter = add.index === 0 ? beginMark : slots[add.index - 1];
-          insertAfter(slot2, elementToInsertAfter);
-          const controller = setChildren(child[add.index], element2, slot2);
-          slots.splice(add.index, 0, slot2);
-          controllers.splice(add.index, 0, controller);
-        }
-        for (let i2 = 0; i2 < changes.swap.length; i2++) {
-          const swap = changes.swap[i2];
-          const controller = controllers[swap.index];
-          const slot2 = slots[swap.index];
-          controllers[swap.index] = controllers[swap.newIndex];
-          slots[swap.index] = slots[swap.newIndex];
-          controllers[swap.newIndex] = controller;
-          slots[swap.newIndex] = slot2;
-        }
-        children = child;
-        return this;
-      },
-      remove() {
-        for (let i2 = 0; i2 < controllers.length; i2++) {
-          controllers[i2].remove();
-        }
-        for (let i2 = 0; i2 < slots.length; i2++) {
-          element2.removeChild(slots[i2]);
-        }
-        element2.removeChild(beginMark);
-      }
-    };
-  }
-  if (isVariableOf(children)) {
-    const slot2 = createEmptyNode();
-    element2.insertBefore(slot2, mark2);
-    let lastController = null;
-    const subscription = children.subscribe((c) => {
-      if (lastController) {
-        lastController = lastController.replace(c);
-      } else {
-        lastController = setChildren(c, element2, slot2);
-      }
-    });
-    return {
-      replace(child) {
-        subscription.dispose();
-        const controller = setChildren(child, element2, slot2);
-        if (lastController) {
-          lastController.remove();
-        }
-        lastController = controller;
-        return controller;
-      },
-      remove() {
-        subscription.dispose();
-        element2.removeChild(slot2);
-      }
-    };
-  }
-  const node = createNode(children);
-  element2.insertBefore(node, mark2);
-  return {
-    replace(child) {
-      const controller = setChildren(child, element2, node);
-      element2.removeChild(node);
-      return controller;
-    },
-    remove() {
-      element2.removeChild(node);
-    }
-  };
-}
-function setChildrenStatically(children, element2, lifecycle) {
+function setStaticChildren(children, element2, lifecycle) {
   if (!Array.isArray(children)) {
     const node = createNode(children);
     element2.appendChild(node);
@@ -3241,35 +3022,174 @@ function setChildrenStatically(children, element2, lifecycle) {
   for (let i2 = 0; i2 < children.length; i2++) {
     const child = children[i2];
     if (!isVariableOf(child)) {
-      setChildrenStatically(child, element2, lifecycle);
+      setStaticChildren(child, element2, lifecycle);
       continue;
     }
     const slot2 = createEmptyNode();
     element2.appendChild(slot2);
-    lifecycle.subscribeDisposable((active) => {
-      if (!active) {
-        return emptyDisposable2;
+    setVariableChild(child, element2, lifecycle, slot2);
+  }
+}
+function setDynamicChildren(children, element2, mark2) {
+  if (Array.isArray(children)) {
+    return setDynamicArrayChild(children, element2, mark2);
+  }
+  if (isVariableOf(children)) {
+    return setDynamicVariableChild(children, element2, mark2);
+  }
+  return setDynamicSimpleChild(children, element2, mark2);
+}
+function setDynamicSimpleChild(children, element2, mark2) {
+  const node = createNode(children);
+  insertAfter(node, mark2);
+  return {
+    replace(child) {
+      this.remove();
+      return setDynamicChildren(child, element2, mark2);
+    },
+    remove() {
+      element2.removeChild(node);
+    }
+  };
+}
+function setDynamicVariableChild(child, element2, mark2) {
+  let lastController = null;
+  const subscription = child.subscribe((c) => {
+    if (lastController !== null) {
+      lastController = lastController.replace(c);
+    } else {
+      lastController = setDynamicChildren(c, element2, mark2);
+    }
+  });
+  return {
+    replace(child2) {
+      this.remove();
+      return setDynamicChildren(child2, element2, mark2);
+    },
+    remove() {
+      subscription.dispose();
+      if (lastController !== null) {
+        lastController.remove();
+        lastController = null;
       }
-      let controller = null;
-      const disposables = new DisposableStore2();
-      disposables.add(child.subscribe(updateChildren));
-      disposables.add(new DisposableAction2(() => {
+    }
+  };
+}
+function setDynamicArrayChild(child, element2, mark2) {
+  if (child.length === 0) {
+    return {
+      replace(child2) {
+        return setDynamicChildren(child2, element2, mark2);
+      },
+      remove() {
+      }
+    };
+  }
+  let children = [...child];
+  const controllers = [];
+  const endMark = createEmptyNode();
+  insertAfter(endMark, mark2);
+  let previousSlot = mark2;
+  const slots = new Array(children.length);
+  for (let i2 = 0; i2 < children.length; i2++) {
+    const slot2 = createEmptyNode();
+    insertAfter(slot2, previousSlot);
+    previousSlot = slot2;
+    slots[i2] = slot2;
+    const child2 = children[i2];
+    const controller = setDynamicChildren(child2, element2, slot2);
+    controllers.push(controller);
+  }
+  return {
+    replace(child2) {
+      if (!Array.isArray(child2)) {
+        this.remove();
+        return setDynamicChildren(child2, element2, mark2);
+      }
+      if (child2.length === 0) {
+        this.remove();
+        return {
+          replace(child3) {
+            return setDynamicChildren(child3, element2, mark2);
+          },
+          remove() {
+          }
+        };
+      }
+      const newChildren = [...child2];
+      const changes = getArrayChanges(children, newChildren);
+      for (let i2 = changes.remove.length - 1; i2 >= 0; --i2) {
+        const remove = changes.remove[i2];
+        controllers[remove.index].remove();
+        controllers.splice(remove.index, 1);
+        element2.removeChild(slots[remove.index]);
+        slots.splice(remove.index, 1);
+      }
+      for (let i2 = 0; i2 < changes.add.length; i2++) {
+        const add = changes.add[i2];
+        const slot2 = createEmptyNode();
+        if (add.index === slots.length) {
+          element2.insertBefore(slot2, endMark);
+        } else {
+          const slotToInsertBefore = slots[add.index];
+          element2.insertBefore(slot2, slotToInsertBefore);
+        }
+        const controller = setDynamicChildren(
+          newChildren[add.index],
+          element2,
+          slot2
+        );
+        slots.splice(add.index, 0, slot2);
+        controllers.splice(add.index, 0, controller);
+      }
+      for (let i2 = 0; i2 < changes.swap.length; i2++) {
+        const swap = changes.swap[i2];
+        const controller = controllers[swap.index];
+        const slot2 = slots[swap.index];
+        controllers[swap.index] = controllers[swap.newIndex];
+        slots[swap.index] = slots[swap.newIndex];
+        controllers[swap.newIndex] = controller;
+        slots[swap.newIndex] = slot2;
+      }
+      children = newChildren;
+      return this;
+    },
+    remove() {
+      for (let i2 = 0; i2 < controllers.length; i2++) {
+        controllers[i2].remove();
+      }
+      for (let i2 = 0; i2 < slots.length; i2++) {
+        element2.removeChild(slots[i2]);
+      }
+      element2.removeChild(endMark);
+    }
+  };
+}
+function setVariableChild(child, element2, lifecycle, mark2) {
+  lifecycle.subscribeDisposable((active) => {
+    if (!active) {
+      return emptyDisposable2;
+    }
+    let controller = null;
+    const disposables = new DisposableStore2();
+    disposables.add(child.subscribe(updateChildren));
+    disposables.add(
+      new DisposableAction2(() => {
         if (controller) {
           controller.remove();
           controller = null;
         }
-      }));
-      return disposables;
-      function updateChildren(newChildrenOpts) {
-        if (!controller) {
-          controller = setChildren(newChildrenOpts, element2, slot2);
-          return;
-        }
-        controller = controller.replace(newChildrenOpts);
+      })
+    );
+    return disposables;
+    function updateChildren(newChildrenOpts) {
+      if (!controller) {
+        controller = setDynamicChildren(newChildrenOpts, element2, mark2);
+        return;
       }
-    });
-  }
-  return;
+      controller = controller.replace(newChildrenOpts);
+    }
+  });
 }
 function createNode(value) {
   if (!value) {
@@ -3304,6 +3224,7 @@ function getContext(value) {
   return value[getContextSymbol];
 }
 function setContextValue(contextValue, value) {
+  ;
   contextValue[setContextValueSymbol](value);
 }
 function useContext(context, defaultValue) {
@@ -3323,17 +3244,21 @@ function useContext(context, defaultValue) {
           return context;
         }
         if (key === setContextValueSymbol) {
-          return function(newValue) {
+          return (newValue) => {
             if (!newValue) {
-              for (let dataMapElement of dataMap) {
-                dataMapElement[1].setSource(null);
+              for (const dataMapElement of dataMap.values()) {
+                dataMapElement.setSource(null);
               }
               return true;
             }
-            for (let key2 in newValue) {
+            for (const key2 in newValue) {
               let value2 = dataMap.get(key2);
               if (!value2) {
-                value2 = createDelegate(initialValue ? initialValue[key2] : null);
+                if (initialValue && key2 in initialValue) {
+                  value2 = createDelegate(initialValue[key2]);
+                } else {
+                  value2 = createDelegate(null);
+                }
                 dataMap.set(key2, value2);
               }
               const v = newValue[key2];
@@ -3352,7 +3277,7 @@ function useContext(context, defaultValue) {
       if (value) {
         return value;
       }
-      if (!initialValue) {
+      if (!initialValue || !(key in initialValue)) {
         value = createDelegate(null);
         dataMap.set(key, value);
         return value;
@@ -3364,7 +3289,7 @@ function useContext(context, defaultValue) {
   });
 }
 function randomUUID() {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
     const v = c === "x" ? r : r & 3 | 8;
     return v.toString(16);
@@ -3450,7 +3375,7 @@ function applyContextProvider(children, provider) {
     return;
   }
   if (Array.isArray(children)) {
-    for (let child of children) {
+    for (const child of children) {
       applyContextProvider(child, provider);
     }
     return;
@@ -3458,15 +3383,8 @@ function applyContextProvider(children, provider) {
   console.warn("Invalid children type");
 }
 function createProvider(context, value) {
-  const key = context.__key;
-  const id = context.__id;
-  if (typeof key !== "string") {
-    throw new Error("Invalid context object");
-  }
-  if (typeof id !== "string") {
-    throw new Error("Invalid context object");
-  }
-  let dataKey = getDataKey(key);
+  const { key, id } = getContextData(context);
+  const dataKey = getDataKey(key);
   const provider = {
     context,
     value,
@@ -3477,8 +3395,18 @@ function createProvider(context, value) {
   providers.set(id, provider);
   return provider;
 }
+function getContextData(context) {
+  if (!("__key" in context) || !("__id" in context)) {
+    throw new Error("Invalid context object");
+  }
+  const c = context;
+  return {
+    key: c.__key,
+    id: c.__id
+  };
+}
 function getDataKey(key) {
-  return "elCtx" + capitalize(key.replace("-", ""));
+  return `elCtx${capitalize(key.replace("-", ""))}`;
 }
 var emptyStringArray = [];
 function applyClasses(element2, lifecycle, classes) {
@@ -3490,124 +3418,86 @@ function applyClasses(element2, lifecycle, classes) {
     return;
   }
   let previousClasses = emptyStringArray;
-  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable2 : classes.subscribe((newClasses) => {
-    if (!Array.isArray(newClasses) || newClasses.length === 0) {
-      if (previousClasses.length === 0) {
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : classes.subscribe((newClasses) => {
+      if (!Array.isArray(newClasses) || newClasses.length === 0) {
+        if (previousClasses.length === 0) {
+          return;
+        }
+        for (let i2 = 0; i2 < previousClasses.length; ++i2) {
+          element2.classList.remove(previousClasses[i2]);
+        }
+        previousClasses = emptyStringArray;
         return;
       }
-      for (let i2 = 0; i2 < previousClasses.length; ++i2) {
-        element2.classList.remove(previousClasses[i2]);
+      const newValues = [...newClasses.filter((c) => !!c)];
+      if (previousClasses.length === 0) {
+        element2.classList.add.apply(element2.classList, newValues);
+        previousClasses = newValues;
+        return;
       }
-      previousClasses = emptyStringArray;
-      return;
-    }
-    const newValues = [...newClasses.filter((c) => !!c)];
-    if (previousClasses.length === 0) {
-      element2.classList.add.apply(element2.classList, newValues);
+      const changes = getArrayChanges(previousClasses, newValues);
+      for (let i2 = 0; i2 < changes.remove.length; ++i2) {
+        element2.classList.remove(changes.remove[i2].item);
+      }
+      for (let i2 = 0; i2 < changes.add.length; ++i2) {
+        element2.classList.add(changes.add[i2].item);
+      }
       previousClasses = newValues;
-      return;
-    }
-    const changes = getArrayChanges(previousClasses, newValues);
-    for (let i2 = 0; i2 < changes.remove.length; ++i2) {
-      element2.classList.remove(changes.remove[i2].item);
-    }
-    for (let i2 = 0; i2 < changes.add.length; ++i2) {
-      element2.classList.add(changes.add[i2].item);
-    }
-    previousClasses = newValues;
-  }));
+    })
+  );
 }
-var propsKey = "_elemiqProps";
-var noProps = Object.freeze({});
-function element(tag, elementOptions) {
-  const element2 = document.createElement(tag);
-  if (elementOptions == void 0) {
-    element2[propsKey] = noProps;
-    applyModification(element2, elementOptions);
-    return element2;
+function getObjectValuesChanges(oldRecord, newRecord, equalityComparer) {
+  if (!oldRecord) {
+    return [null, newRecord];
   }
-  element2[propsKey] = elementOptions;
-  const lifecycle = createLifecycle(element2);
-  applyOptions(element2, elementOptions, lifecycle);
-  applyModification(element2, elementOptions);
-  return element2;
+  if (!newRecord) {
+    return [Object.keys(oldRecord), null];
+  }
+  let keysToDelete = null;
+  let toAddOrChange = null;
+  for (const key in oldRecord) {
+    if (!(key in newRecord)) {
+      if (keysToDelete === null) {
+        keysToDelete = [key];
+      } else {
+        keysToDelete.push(key);
+      }
+    }
+  }
+  const comparer = equalityComparer || defaultEqualityComparer;
+  for (const key in newRecord) {
+    const oldValue = oldRecord[key];
+    if (oldValue === void 0) {
+      if (toAddOrChange === null) {
+        toAddOrChange = { [key]: newRecord[key] };
+      } else {
+        toAddOrChange[key] = newRecord[key];
+      }
+      continue;
+    }
+    if (!comparer(oldValue, newRecord[key], key)) {
+      if (toAddOrChange === null) {
+        toAddOrChange = { [key]: newRecord[key] };
+      } else {
+        toAddOrChange[key] = newRecord[key];
+      }
+    }
+  }
+  return [keysToDelete, toAddOrChange];
 }
-function applyOptions(element2, elementOptions, lifecycle) {
-  let parent = void 0;
-  let key;
-  const context = elementOptions.context;
-  if (context != void 0) {
-    applyContext(element2, lifecycle, context);
-  }
-  for (key in elementOptions) {
-    if (key === "context") {
-      continue;
-    }
-    const value = elementOptions[key];
-    if (key === "children") {
-      applyChildren(element2, lifecycle, value);
-      continue;
-    }
-    if (key === "classes") {
-      applyClasses(element2, lifecycle, value);
-      continue;
-    }
-    if (key === "style") {
-      applyStyle(element2, lifecycle, value);
-      continue;
-    }
-    if (key === "parent") {
-      parent = value;
-      continue;
-    }
-    if (key === "dataset") {
-      applyDataset(element2, lifecycle, value);
-      continue;
-    }
-    if (key === "controller") {
-      applyController(element2, value);
-      continue;
-    }
-    if (key.startsWith("on")) {
-      if (key === "onMount") {
-        applyOnMount(element2, lifecycle, value);
-        continue;
-      }
-      if (key === "onAttachedToDom") {
-        element2.addEventListener("attachedToDom", value);
-        continue;
-      }
-      if (key === "onDetachedFromDom") {
-        element2.addEventListener("detachedFromDom", value);
-        continue;
-      }
-      const eventName = key[2].toLowerCase() + key.slice(3);
-      element2.addEventListener(eventName, value);
-      continue;
-    }
-    applyProperty(element2, lifecycle, key, value);
-  }
-  if (parent !== void 0) {
-    applyParent(element2, lifecycle, parent);
-  }
-}
-function createLifecycle(element2) {
-  return new FuncVariable((vary) => {
-    element2.dataset[domListenKey] = "t";
-    const attachListener = function() {
-      vary.value = true;
-    };
-    const detachListener = function() {
-      vary.value = false;
-    };
-    element2.addEventListener("attachedToDom", attachListener);
-    element2.addEventListener("detachedFromDom", detachListener);
-    vary.value = element2.isConnected;
-    return createDisposiq(() => {
-      element2.removeEventListener("attachedToDom", attachListener);
-      element2.removeEventListener("detachedFromDom", detachListener);
-    });
-  }, () => element2.isConnected);
+function listenObjectKVChanges(variable, handler) {
+  let currentState = variable.value;
+  const subscription = variable.subscribeSilent((value) => {
+    const [keysToDelete, dataToAddOrChange] = getObjectValuesChanges(
+      currentState,
+      value
+    );
+    currentState = value;
+    handler(keysToDelete, dataToAddOrChange);
+  });
+  handler(null, currentState);
+  return subscription;
 }
 function applyStyle(element2, lifecycle, style2) {
   if (!style2) {
@@ -3647,35 +3537,40 @@ function applyStyle(element2, lifecycle, style2) {
     const disposables = new DisposableStore2();
     const dispoMapStore = new DisposableMapStore();
     disposables.add(dispoMapStore);
-    disposables.add(listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
-      if (keysToDelete !== null) {
-        for (let key of keysToDelete) {
-          element2.style.removeProperty(key);
-          dispoMapStore.delete(key);
-        }
-      }
-      if (changesToAddOrModify !== null) {
-        for (let key in changesToAddOrModify) {
-          const value = changesToAddOrModify[key];
-          if (isVariableOf(value)) {
-            dispoMapStore.set(key, value.subscribe((newValue) => {
-              if (newValue === void 0) {
-                element2.style.removeProperty(key);
-                return;
-              }
-              element2.style[key] = newValue != null ? newValue : "";
-            }));
-            continue;
-          }
-          dispoMapStore.delete(key);
-          if (value === void 0) {
+    disposables.add(
+      listenObjectKVChanges(style2, (keysToDelete, changesToAddOrModify) => {
+        if (keysToDelete !== null) {
+          for (const key of keysToDelete) {
             element2.style.removeProperty(key);
-            continue;
+            dispoMapStore.delete(key);
           }
-          element2.style[key] = value != null ? value : "";
         }
-      }
-    }));
+        if (changesToAddOrModify !== null) {
+          for (const key in changesToAddOrModify) {
+            const value = changesToAddOrModify[key];
+            if (isVariableOf(value)) {
+              dispoMapStore.set(
+                key,
+                value.subscribe((newValue) => {
+                  if (newValue === void 0) {
+                    element2.style.removeProperty(key);
+                    return;
+                  }
+                  element2.style[key] = newValue != null ? newValue : "";
+                })
+              );
+              continue;
+            }
+            dispoMapStore.delete(key);
+            if (value === void 0) {
+              element2.style.removeProperty(key);
+              continue;
+            }
+            element2.style[key] = value != null ? value : "";
+          }
+        }
+      })
+    );
     return disposables;
   });
 }
@@ -3684,54 +3579,64 @@ function applyDataset(element2, lifecycle, dataset) {
     return;
   }
   if (!isVariableOf(dataset)) {
-    for (let key in dataset) {
+    for (const key in dataset) {
       element2.dataset[key] = dataset[key];
     }
     return;
   }
-  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable2 : listenObjectKVChanges(dataset, (keysToDelete, changesToAddOrModify) => {
-    if (keysToDelete !== null) {
-      for (let key of keysToDelete) {
-        delete element2.dataset[key];
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : listenObjectKVChanges(dataset, (keysToDelete, changesToAddOrModify) => {
+      if (keysToDelete !== null) {
+        for (const key of keysToDelete) {
+          delete element2.dataset[key];
+        }
       }
-    }
-    if (changesToAddOrModify !== null) {
-      for (let key in changesToAddOrModify) {
-        element2.dataset[key] = changesToAddOrModify[key];
+      if (changesToAddOrModify !== null) {
+        for (const key in changesToAddOrModify) {
+          element2.dataset[key] = changesToAddOrModify[key];
+        }
       }
+    })
+  );
+}
+var setHandler = Symbol("setHandler");
+function createController() {
+  let ref = void 0;
+  const obj = {};
+  return new Proxy(obj, {
+    get(target, p2, receiver) {
+      if (p2 === setHandler) {
+        return (handler) => {
+          if (ref !== void 0) {
+            console.error("Controller used multiple times");
+          }
+          ref = handler;
+        };
+      }
+      if (ref === void 0) {
+        throw new Error("Controller is not in use");
+      }
+      return ref(p2);
     }
-  }));
+  });
+}
+function useController(controller, handler) {
+  if (!controller) {
+    return;
+  }
+  ;
+  controller[setHandler](
+    (key) => {
+      const value = handler[key];
+      if (value instanceof Function) {
+        return (...args) => value.apply(handler, args);
+      }
+      return value;
+    }
+  );
 }
 function applyController(element2, controller) {
   useController(controller, element2);
-}
-function applyOnMount(element2, lifecycle, onMount) {
-  if (!onMount) {
-    return;
-  }
-  if (!isVariableOf(onMount)) {
-    lifecycle.subscribeDisposable((active) => {
-      var _a;
-      return active ? createDisposable2((_a = onMount.call(element2)) != null ? _a : emptyDisposable2) : emptyDisposable2;
-    });
-    return;
-  }
-  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable2 : onMount.subscribeDisposable((value) => {
-    var _a;
-    return !value ? emptyDisposable2 : createDisposable2((_a = onMount.call(element2)) != null ? _a : emptyDisposable2);
-  }));
-}
-function applyProperty(element2, lifecycle, key, value) {
-  if (value === void 0) {
-    return;
-  }
-  if (!isVariableOf(value)) {
-    element2[key] = value;
-    return;
-  }
-  lifecycle.subscribeDisposable(
-    (active) => !active ? emptyDisposable2 : value.subscribe((newValue) => element2[key] = newValue)
-  );
 }
 function applyParent(element2, lifecycle, parent) {
   if (!parent) {
@@ -3742,41 +3647,179 @@ function applyParent(element2, lifecycle, parent) {
     return;
   }
   let previousParent;
-  lifecycle.subscribeDisposable((active) => !active ? emptyDisposable2 : parent.subscribe((newParent) => {
-    if (previousParent === newParent) {
-      return;
-    }
-    if (!newParent) {
-      if (previousParent !== void 0) {
-        previousParent.removeChild(element2);
-        previousParent = void 0;
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : parent.subscribe((newParent) => {
+      if (previousParent === newParent) {
+        return;
       }
-      return;
-    }
-    if (previousParent === void 0) {
+      if (!newParent) {
+        if (previousParent !== void 0) {
+          previousParent.removeChild(element2);
+          previousParent = void 0;
+        }
+        return;
+      }
+      if (previousParent === void 0) {
+        newParent.appendChild(element2);
+        previousParent = newParent;
+        return;
+      }
+      previousParent.removeChild(element2);
       newParent.appendChild(element2);
       previousParent = newParent;
-      return;
-    }
-    previousParent.removeChild(element2);
-    newParent.appendChild(element2);
-    previousParent = newParent;
-  }));
+    })
+  );
 }
-function listenObjectKVChanges(variable, handler) {
-  let currentState = variable.value;
-  const subscription = variable.subscribeSilent((value) => {
-    let [keysToDelete, dataToAddOrChange] = getObjectValuesChanges(currentState, value);
-    currentState = value;
-    handler(keysToDelete, dataToAddOrChange);
-  });
-  handler(null, currentState);
-  return subscription;
+function applyProperty(element2, lifecycle, key, value) {
+  if (value === void 0) {
+    return;
+  }
+  if (!isVariableOf(value)) {
+    element2[key] = value;
+    return;
+  }
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : value.subscribe((newValue) => {
+      element2[key] = newValue;
+    })
+  );
+}
+function applyOnMount(element2, lifecycle, onMount) {
+  if (!onMount) {
+    return;
+  }
+  if (!isVariableOf(onMount)) {
+    lifecycle.subscribeDisposable(
+      (active) => {
+        var _a;
+        return active ? createDisposable2((_a = onMount.call(element2)) != null ? _a : emptyDisposable2) : emptyDisposable2;
+      }
+    );
+    return;
+  }
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : onMount.subscribeDisposable(
+      (value) => {
+        var _a;
+        return !value ? emptyDisposable2 : createDisposable2((_a = value.call(element2)) != null ? _a : emptyDisposable2);
+      }
+    )
+  );
+}
+function applyEvent(element2, key, value, lifecycle) {
+  if (key === "onMount") {
+    applyOnMount(
+      element2,
+      lifecycle,
+      value
+    );
+    return;
+  }
+  const eventName = key[2].toLowerCase() + key.slice(3);
+  if (!isVariableOf(value)) {
+    element2.addEventListener(eventName, value);
+    return;
+  }
+  lifecycle.subscribeDisposable(
+    (active) => !active ? emptyDisposable2 : value.subscribeDisposable((newValue) => {
+      return addEventListener(element2, eventName, newValue);
+    })
+  );
+}
+var propsKey = "_elemiqProps";
+var noProps = Object.freeze({});
+function element(tag, elementOptions) {
+  const element2 = document.createElement(tag);
+  if (elementOptions == void 0) {
+    element2[propsKey] = noProps;
+    applyModification(element2, elementOptions);
+    return element2;
+  }
+  element2[propsKey] = elementOptions;
+  const lifecycle = createElementLifecycle(element2);
+  applyOptions(element2, elementOptions, lifecycle);
+  applyModification(element2, elementOptions);
+  return element2;
+}
+function applyOptions(element2, elementOptions, lifecycle) {
+  let parent = void 0;
+  let key;
+  const context = elementOptions.context;
+  if (context != void 0) {
+    applyContext(element2, lifecycle, context);
+  }
+  for (key in elementOptions) {
+    if (key === "context") {
+      continue;
+    }
+    const value = elementOptions[key];
+    if (key === "children") {
+      applyChildren(
+        element2,
+        lifecycle,
+        value
+      );
+      continue;
+    }
+    if (key === "classes") {
+      applyClasses(element2, lifecycle, value);
+      continue;
+    }
+    if (key === "style") {
+      applyStyle(element2, lifecycle, value);
+      continue;
+    }
+    if (key === "parent") {
+      parent = value;
+      continue;
+    }
+    if (key === "dataset") {
+      applyDataset(
+        element2,
+        lifecycle,
+        value
+      );
+      continue;
+    }
+    if (key === "controller") {
+      applyController(element2, value);
+      continue;
+    }
+    if (key.startsWith("on")) {
+      applyEvent(element2, key, value, lifecycle);
+      continue;
+    }
+    applyProperty(element2, lifecycle, key, value);
+  }
+  if (parent != void 0) {
+    applyParent(element2, lifecycle, parent);
+  }
+}
+function createElementLifecycle(element2) {
+  return new FuncVariable(
+    (vary) => {
+      element2.dataset[domListenKey] = "t";
+      const attachListener = () => {
+        vary.value = true;
+      };
+      const detachListener = () => {
+        vary.value = false;
+      };
+      element2.addEventListener("attachedToDom", attachListener);
+      element2.addEventListener("detachedFromDom", detachListener);
+      vary.value = element2.isConnected;
+      return createDisposiq(() => {
+        element2.removeEventListener("attachedToDom", attachListener);
+        element2.removeEventListener("detachedFromDom", detachListener);
+      });
+    },
+    () => element2.isConnected
+  );
 }
 runMutationObserver();
 var theme = new MutableVariable("dark");
 function getThemeStyle(forTheme) {
-  forTheme = forTheme != null ? forTheme : theme;
+  const styleTheme = forTheme != null ? forTheme : theme;
   return {
     normalColor: new MutableVariable("#232323"),
     primaryColor: new MutableVariable("#227093"),
@@ -3785,7 +3828,7 @@ function getThemeStyle(forTheme) {
     errorColor: new MutableVariable("#ff5252"),
     warningColor: new MutableVariable("#ffda79"),
     infoColor: new MutableVariable("#34ace0"),
-    textColor: forTheme.map((t) => {
+    textColor: styleTheme.map((t) => {
       return t === "dark" ? "#ffffff" : "#000000";
     })
   };
@@ -3821,7 +3864,7 @@ function makeClassStyles(styles, disposable) {
     key = key.trim();
     const style2 = styles[key];
     if (key.indexOf(" ") !== -1 || key.indexOf(".") !== -1 || key.indexOf(">") !== -1 || key.indexOf(":") !== -1) {
-      let kKey = getFirstWord(key);
+      const kKey = getFirstWord(key);
       const classCounter = _classNames.get(kKey);
       if (classCounter === void 0) {
         console.error("Invalid class name", key);
@@ -3829,7 +3872,7 @@ function makeClassStyles(styles, disposable) {
       }
       const className2 = kKey + classCounter;
       stylesResult.push({
-        rule: "." + className2 + key.substring(kKey.length),
+        rule: `.${className2}${key.substring(kKey.length)}`,
         declaration: style2
       });
       continue;
@@ -3844,7 +3887,7 @@ function makeClassStyles(styles, disposable) {
       className += (existingClassCounter + 1).toString();
     }
     stylesResult.push({
-      rule: "." + className,
+      rule: `.${className}`,
       declaration: style2
     });
     result[key] = className;
@@ -3860,9 +3903,16 @@ function _addStyles(styles) {
   style2.textContent = "\n";
   style2.id = generateStyleId();
   const attachSubscription = attachStyleElement(style2);
-  for (let style1 of styles) {
+  const sheet = style2.sheet;
+  if (!sheet) {
+    return attachSubscription;
+  }
+  for (const style1 of styles) {
     const styleData = getStyleDeclaration(style1.declaration);
-    style2.sheet.insertRule(`${style1.rule} { ${styleData.cssText} }`, style2.sheet.cssRules.length);
+    sheet.insertRule(
+      `${style1.rule} { ${styleData.cssText} }`,
+      sheet.cssRules.length
+    );
   }
   return attachSubscription;
 }
@@ -3889,20 +3939,20 @@ function getStyleDeclaration(style2) {
 }
 var styleIdCounter = 0;
 function generateStyleId() {
-  return "elemiq-style-" + ++styleIdCounter;
+  return `elemiq-style-${++styleIdCounter}`;
 }
 function getFirstWord(str) {
   for (let i2 = 0; i2 < str.length; i2++) {
     const charCode = str.charCodeAt(i2);
-    let aLetter = charCode >= 65 && charCode < 91 || charCode >= 97 && charCode < 123;
+    const aLetter = charCode >= 65 && charCode < 91 || charCode >= 97 && charCode < 123;
     if (aLetter) {
       continue;
     }
-    let aDigit = charCode >= 48 && charCode < 58;
+    const aDigit = charCode >= 48 && charCode < 58;
     if (aDigit) {
       continue;
     }
-    let isUnderscoreOrHyphen = charCode === 95 || charCode === 45;
+    const isUnderscoreOrHyphen = charCode === 95 || charCode === 45;
     if (isUnderscoreOrHyphen) {
       continue;
     }
@@ -3976,7 +4026,7 @@ var buttonStyles = makeClassStyles({
   }
 });
 function Button(props) {
-  let controller = props.controller == void 0 ? void 0 : createController();
+  const controller = props.controller == void 0 ? void 0 : createController();
   if (controller) {
     useController(props.controller, {
       click() {
@@ -4002,7 +4052,9 @@ function Button(props) {
   );
   const variantColor = variant.switchMap((v) => themeStyle2[`${v}Color`]);
   const borderWidth = appearance.map((a2) => a2 === "outline" ? "2px" : "0");
-  const backgroundColor = appearance.switchMap((a2) => a2 === "normal" || a2 === "solid" ? variantColor : createConst("transparent"));
+  const backgroundColor = appearance.switchMap(
+    (a2) => a2 === "normal" || a2 === "solid" ? variantColor : createConst("transparent")
+  );
   const borderColor = variantColor;
   const textColor = appearance.switchMap((a2) => {
     switch (a2) {
@@ -4016,7 +4068,9 @@ function Button(props) {
         return themeStyle2.textColor;
     }
   });
-  const textDecoration = appearance.map((a2) => a2 === "link" ? "underline" : "none");
+  const textDecoration = appearance.map(
+    (a2) => a2 === "link" ? "underline" : "none"
+  );
   const style2 = toVariable(props.style).map((s2) => ({
     backgroundColor,
     color: textColor,
@@ -4038,7 +4092,7 @@ function Button(props) {
   });
 }
 function lightenColor(hex, percent) {
-  const num = parseInt(hex.slice(1), 16);
+  const num = Number.parseInt(hex.slice(1), 16);
   const r = (num >> 16) + Math.round(255 * percent);
   const g = (num >> 8 & 255) + Math.round(255 * percent);
   const b2 = (num & 255) + Math.round(255 * percent);
@@ -4051,7 +4105,7 @@ function lightenColor(hex, percent) {
 function renderJsx(tag, props, _key) {
   if (!tag) {
     return span({
-      innerText: "Not supported tag '" + tag + "'"
+      innerText: `Not supported tag '${tag}'`
     });
   }
   if (typeof tag === "string") {
@@ -4059,7 +4113,7 @@ function renderJsx(tag, props, _key) {
   }
   if (typeof tag !== "function") {
     return span({
-      innerText: "Not supported tag '" + tag + "'"
+      innerText: `Not supported tag '${tag}'`
     });
   }
   if (isClassComponent(tag)) {
@@ -4084,8 +4138,22 @@ function AnotherView() {
 function View() {
   const theme2 = createVar("dark");
   const count = createVar(0);
-  const variants = ["normal", "primary", "secondary", "success", "error", "warning", "info"];
-  const appearances = ["normal", "solid", "outline", "link", "ghost"];
+  const variants = [
+    "normal",
+    "primary",
+    "secondary",
+    "success",
+    "error",
+    "warning",
+    "info"
+  ];
+  const appearances = [
+    "normal",
+    "solid",
+    "outline",
+    "link",
+    "ghost"
+  ];
   const variant = createVar("normal");
   const appearance = createVar("normal");
   const dynamicElements = createVar([]);
@@ -4094,36 +4162,80 @@ function View() {
     /* @__PURE__ */ jsxs("span", { children: [
       count.map((c) => c % 10 === 0 ? /* @__PURE__ */ jsx("span", { children: "Wow!" }) : c.toString()),
       " ",
-      " times. ",
-      " ",
+      "times. ",
       count.map((c) => "Next: " + (c + 1))
     ] }),
     /* @__PURE__ */ jsx("br", {}),
-    /* @__PURE__ */ jsx(Button, { variant, appearance, onClick: () => {
-      count.value += 1;
-    }, children: "Click me" }),
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        variant,
+        appearance,
+        onClick: () => {
+          count.value += 1;
+        },
+        children: "Click me"
+      }
+    ),
     /* @__PURE__ */ jsx(Button, { variant, appearance, disabled: true, children: "Disabled" }),
     /* @__PURE__ */ jsx("br", {}),
     /* @__PURE__ */ jsx("br", {}),
-    variants.map((v) => /* @__PURE__ */ jsx(Button, { variant: v, onClick: () => variant.value = v, children: v })),
+    variants.map((v) => /* @__PURE__ */ jsx(
+      Button,
+      {
+        variant: v,
+        onClick: () => {
+          variant.value = v;
+        },
+        children: v
+      }
+    )),
     /* @__PURE__ */ jsx("br", {}),
-    appearances.map((a) => /* @__PURE__ */ jsx(Button, { appearance: a, onClick: () => appearance.value = a, children: a })),
+    appearances.map((a) => /* @__PURE__ */ jsx(
+      Button,
+      {
+        appearance: a,
+        onClick: () => {
+          appearance.value = a;
+        },
+        children: a
+      }
+    )),
     /* @__PURE__ */ jsx("br", {}),
     dynamicElements,
     /* @__PURE__ */ jsx("br", {}),
-    /* @__PURE__ */ jsx(Button, { onClick: () => {
-      const startTime = performance.now();
-      const random = Math.random() * 1e6;
-      dynamicElements.value = [dynamicElements.value, /* @__PURE__ */ jsxs(Button, { children: [
-        "Dynamic ",
-        random.toString()
-      ] })];
-      console.info("Dynamic elements", dynamicElements.value);
-      console.log("Dynamic elements change time:", performance.now() - startTime, "ms");
-    }, children: "Add dynamic element" }),
-    /* @__PURE__ */ jsx(Button, { onClick: () => {
-      theme2.value = theme2.value === "light" ? "dark" : "light";
-    }, children: "Change theme" })
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        onClick: () => {
+          const startTime = performance.now();
+          const random = Math.random() * 1e6;
+          dynamicElements.value = [
+            dynamicElements.value,
+            /* @__PURE__ */ jsxs(Button, { children: [
+              "Dynamic ",
+              random.toString()
+            ] })
+          ];
+          console.info("Dynamic elements", dynamicElements.value);
+          console.log(
+            "Dynamic elements change time:",
+            performance.now() - startTime,
+            "ms"
+          );
+        },
+        children: "Add dynamic element"
+      }
+    ),
+    /* @__PURE__ */ jsx(
+      Button,
+      {
+        onClick: () => {
+          theme2.value = theme2.value === "light" ? "dark" : "light";
+        },
+        children: "Change theme"
+      }
+    )
   ] }) });
 }
 window.onload = () => {

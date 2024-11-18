@@ -1,18 +1,19 @@
-import {ElementOptions} from "@/types/element.ts";
+import type { ElementOptions } from "@/types/element.ts"
 
-export interface Modifier {
-  (element: HTMLElement, elementOptions?: ElementOptions): void
-}
+export type Modifier = (
+  element: HTMLElement,
+  elementOptions?: ElementOptions,
+) => void
 
 const modifiers: Modifier[] = []
 let hasModifiers = false
 
-export function addModifier(modifier: Modifier) {
+export function addModifier(modifier: Modifier): void {
   modifiers.push(modifier)
-  hasModifiers = true;
+  hasModifiers = true
 }
 
-export function addTagModifier(tag: string, modifier: Modifier) {
+export function addTagModifier(tag: string, modifier: Modifier): void {
   addModifier((element, elementOptions) => {
     if (element.tagName === tag) {
       modifier(element, elementOptions)
@@ -20,7 +21,10 @@ export function addTagModifier(tag: string, modifier: Modifier) {
   })
 }
 
-export function applyModification<K extends keyof HTMLElementTagNameMap, E extends HTMLElementTagNameMap[K] = HTMLElementTagNameMap[K]>(element: E, elementOptions?: ElementOptions<E>) {
+export function applyModification<
+  K extends keyof HTMLElementTagNameMap,
+  E extends HTMLElementTagNameMap[K] = HTMLElementTagNameMap[K],
+>(element: E, elementOptions?: ElementOptions<E>): void {
   if (!hasModifiers) {
     return
   }

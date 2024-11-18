@@ -1,5 +1,10 @@
-import {renderJsx} from "./render.ts"
-import {ClassComponent, ElementOptions, ElementValue, FunctionComponent} from "../index.ts";
+import { renderJsx } from "./render.ts"
+import type {
+  ClassComponent,
+  ElementOptions,
+  ElementValue,
+  FunctionComponent,
+} from "../index.ts"
 
 export namespace JSX {
   export type ElementType =
@@ -7,17 +12,17 @@ export namespace JSX {
     | FunctionComponent
     | ClassComponent
 
-  export interface Element extends ElementValue {
-  }
+  export interface Element extends ElementValue {}
 
-  export interface ElementClass extends ClassComponent {
-  }
+  export interface ElementClass extends ClassComponent {}
 
   export interface ElementAttributesProperty {
+    // biome-ignore lint/complexity/noBannedTypes: No need to define a type for this property
     props: {}
   }
 
   export interface ElementChildrenAttribute {
+    // biome-ignore lint/complexity/noBannedTypes: No need to define a type for this property
     children: {}
   }
 
@@ -25,10 +30,12 @@ export namespace JSX {
     [K in keyof HTMLElementTagNameMap]: ElementOptions<HTMLElementTagNameMap[K]>
   }
 
+  // biome-ignore lint/suspicious/noEmptyInterface: Empty interface is needed for type checking
   export interface IntrinsicAttributes {
     // key?: string | number | null | undefined
   }
 
+  // biome-ignore lint/suspicious/noEmptyInterface: Empty interface is needed for type checking
   export interface IntrinsicClassAttributes<T> {
     // ref?: Ref<T> | undefined
   }

@@ -5,5 +5,7 @@ export interface Style {
   declaration: StyleDeclaration
 }
 
-export type ClassNameMap<ClassKey extends string = string> = Record<ClassKey, string>;
-
+export type ClassNameMap<ClassKey extends string = string> = Record<
+  ClassKey,
+  string
+>

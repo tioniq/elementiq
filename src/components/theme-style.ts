@@ -1,5 +1,9 @@
-import { Var, Vary } from "@tioniq/eventiq";
-import { Context, ContextValue, createContext } from "@/context/context.js";
+import { type Var, Vary } from "@tioniq/eventiq"
+import {
+  type Context,
+  type ContextValue,
+  createContext,
+} from "@/context/context.ts"
 
 export const theme: Var<Exclude<keyof Theme, "system">> = new Vary("dark")
 
@@ -10,7 +14,7 @@ export interface Theme {
 }
 
 export function getThemeStyle(forTheme?: Var<keyof Theme>) {
-  forTheme = forTheme ?? theme
+  const styleTheme = forTheme ?? theme
   return {
     normalColor: new Vary("#232323"),
     primaryColor: new Vary("#227093"),
@@ -19,14 +23,16 @@ export function getThemeStyle(forTheme?: Var<keyof Theme>) {
     errorColor: new Vary("#ff5252"),
     warningColor: new Vary("#ffda79"),
     infoColor: new Vary("#34ace0"),
-    textColor: forTheme.map(t => {
+    textColor: styleTheme.map((t) => {
       // console.debug("Getting text color for theme", t)
-      return t === "dark" ? "#ffffff" : "#000000";
+      return t === "dark" ? "#ffffff" : "#000000"
     }),
   }
 }
 
-export function getThemeStyleFromContext(context: ContextValue<ThemeContextValue>) {
+export function getThemeStyleFromContext(
+  context: ContextValue<ThemeContextValue>,
+) {
   return getThemeStyle(context.theme)
 }
 

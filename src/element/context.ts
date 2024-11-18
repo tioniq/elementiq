@@ -1,16 +1,26 @@
-import { isVariableOf, Var } from "@tioniq/eventiq";
-import { Context, ContextType, ContextValue, getContext, setContextValue } from "@/context/context.js";
-import { emptyDisposable } from "@tioniq/disposiq";
-import { ElementChildren } from "@/types/element.js";
-import { capitalize } from "@/utils/string-utils.js";
+import { isVariableOf, type Var } from "@tioniq/eventiq"
+import {
+  type Context,
+  type ContextType,
+  type ContextValue,
+  getContext,
+  setContextValue,
+} from "@/context/context.ts"
+import { emptyDisposable } from "@tioniq/disposiq"
+import type { ElementChildren } from "@/types/element.ts"
+import { capitalize } from "@/utils/string-utils.ts"
 
-const providers: Map<string, IContextProvider<any>> = new Map()
+const providers: Map<string, IContextProvider<ContextType>> = new Map()
 
-export function applyContext(element: HTMLElement, lifecycle: Var<boolean>, contextValue: ContextValue<any>) {
+export function applyContext(
+  element: HTMLElement,
+  lifecycle: Var<boolean>,
+  contextValue: ContextValue<ContextType>,
+) {
   if (!contextValue) {
     return
   }
-  lifecycle.subscribeDisposable(active => {
+  lifecycle.subscribeDisposable((active) => {
     if (!active) {
       return emptyDisposable
     }
@@ -24,12 +34,15 @@ export function applyContext(element: HTMLElement, lifecycle: Var<boolean>, cont
   })
 }
 
-function findContextProvider(element: HTMLElement, context: Context<any>): IContextProvider<any> | null {
+function findContextProvider(
+  element: HTMLElement,
+  context: Context<ContextType>,
+): IContextProvider<ContextType> | null {
   if (!context) {
     return null
   }
   let el: HTMLElement | null = element
-  const keyToFind = getDataKey((context as any).__key)
+  const keyToFind = getDataKey((context as ContextImpl<ContextType>).__key)
   while (el != null) {
     const providerId = el.dataset[keyToFind]
     if (providerId) {
@@ -46,8 +59,8 @@ function findContextProvider(element: HTMLElement, context: Context<any>): ICont
 }
 
 export function ContextProvider<T extends ContextType>(props: {
-  context: Context<T>,
-  value: T,
+  context: Context<T>
+  value: T
   children: ElementChildren
 }) {
   const provider = createProvider(props.context, props.value)
@@ -58,7 +71,10 @@ export function ContextProvider<T extends ContextType>(props: {
   return props.children
 }
 
-function applyContextProvider(children: ElementChildren, provider: IContextProvider<any>) {
+function applyContextProvider(
+  children: ElementChildren,
+  provider: IContextProvider<ContextType>,
+) {
   if (!provider) {
     return
   }
@@ -67,13 +83,13 @@ function applyContextProvider(children: ElementChildren, provider: IContextProvi
     return
   }
   if (isVariableOf(children)) {
-    children.subscribe(value => {
+    children.subscribe((value) => {
       applyContextProvider(value, provider)
     })
     return
   }
   if (Array.isArray(children)) {
-    for (let child of children) {
+    for (const child of children) {
       applyContextProvider(child, provider)
     }
     return
@@ -90,26 +106,41 @@ interface IContextProvider<T extends ContextType> {
 }
 
 function createProvider<T extends ContextType>(context: Context<T>, value: T) {
-  const key = (context as any).__key
-  const id = (context as any).__id
-  if (typeof key !== "string") {
-    throw new Error("Invalid context object")
-  }
-  if (typeof id !== "string") {
-    throw new Error("Invalid context object")
-  }
-  let dataKey = getDataKey(key)
+  const { key, id } = getContextData(context)
+  const dataKey = getDataKey(key)
   const provider: IContextProvider<T> = {
     context: context,
     value: value,
     key: key,
     id: id,
-    dataKey: dataKey
+    dataKey: dataKey,
   }
   providers.set(id, provider)
   return provider
 }
 
+function getContextData<T extends ContextType>(
+  context: Context<T>,
+): {
+  key: string
+  id: string
+} {
+  if (!("__key" in context) || !("__id" in context)) {
+    throw new Error("Invalid context object")
+  }
+  const c = context as ContextImpl<ContextType>
+  return {
+    key: c.__key,
+    id: c.__id,
+  }
+}
+
 function getDataKey(key: string) {
-  return 'elCtx' + capitalize(key.replace('-', ''))
+  return `elCtx${capitalize(key.replace("-", ""))}`
+}
+
+interface ContextImpl<T extends ContextType> extends Context<T> {
+  readonly __key: string
+  readonly __id: string
+  __defaultValue?: T | null
 }

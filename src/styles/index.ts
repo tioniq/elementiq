@@ -1,7 +1,11 @@
-import {ClassNameMap, Style, StyleDeclaration} from "./types.js";
-import {DisposableAction, IDisposable, IDisposablesContainer} from "@tioniq/disposiq";
+import type { ClassNameMap, Style, StyleDeclaration } from "./types.ts"
+import {
+  DisposableAction,
+  type IDisposable,
+  type IDisposablesContainer,
+} from "@tioniq/disposiq"
 
-export * from "./types.js"
+export * from "./types.ts"
 
 const _addedStyles: HTMLStyleElement[] = []
 
@@ -16,15 +20,21 @@ export function addStyles(styles: Style[]): IDisposable {
 const _classNames = new Map<string, number>()
 
 export function makeClassStyles<ClassKey extends string = string>(
-  styles: Record<ClassKey, StyleDeclaration>, disposable?: IDisposablesContainer)
-  : ClassNameMap<ClassKey> {
-  const result: ClassNameMap<ClassKey> = {} as any
+  styles: Record<ClassKey, StyleDeclaration>,
+  disposable?: IDisposablesContainer,
+): ClassNameMap<ClassKey> {
+  const result: ClassNameMap<ClassKey> = {} as unknown as ClassNameMap<ClassKey>
   const stylesResult: Style[] = []
   for (let key in styles) {
-    key = key.trim() as any
+    key = key.trim() as Extract<ClassKey, string>
     const style = styles[key]
-    if (key.indexOf(" ") !== -1 || key.indexOf(".") !== -1 || key.indexOf(">") !== -1 || key.indexOf(":") !== -1) {
-      let kKey = getFirstWord(key)
+    if (
+      key.indexOf(" ") !== -1 ||
+      key.indexOf(".") !== -1 ||
+      key.indexOf(">") !== -1 ||
+      key.indexOf(":") !== -1
+    ) {
+      const kKey = getFirstWord(key)
       const classCounter = _classNames.get(kKey)
       if (classCounter === undefined) {
         console.error("Invalid class name", key)
@@ -32,8 +42,8 @@ export function makeClassStyles<ClassKey extends string = string>(
       }
       const className = kKey + classCounter
       stylesResult.push({
-        rule: "." + className + key.substring(kKey.length),
-        declaration: style
+        rule: `.${className}${key.substring(kKey.length)}`,
+        declaration: style,
       })
       continue
     }
@@ -47,8 +57,8 @@ export function makeClassStyles<ClassKey extends string = string>(
       className += (existingClassCounter + 1).toString()
     }
     stylesResult.push({
-      rule: "." + className,
-      declaration: style
+      rule: `.${className}`,
+      declaration: style,
     })
     result[key] = className
   }
@@ -62,7 +72,7 @@ export function makeClassStyles<ClassKey extends string = string>(
 export function removeAllGeneratedStyles() {
   const styles = [..._addedStyles]
   _addedStyles.length = 0
-  for (let style of styles) {
+  for (const style of styles) {
     style.remove()
   }
 }
@@ -76,12 +86,19 @@ function _addRawStyle(rawCss: string): IDisposable {
 
 function _addStyles(styles: Style[]): IDisposable {
   const style = document.createElement("style")
-  style.textContent = '\n'
+  style.textContent = "\n"
   style.id = generateStyleId()
   const attachSubscription = attachStyleElement(style)
-  for (let style1 of styles) {
+  const sheet = style.sheet
+  if (!sheet) {
+    return attachSubscription
+  }
+  for (const style1 of styles) {
     const styleData = getStyleDeclaration(style1.declaration)
-    style.sheet!.insertRule(`${style1.rule} { ${styleData.cssText} }`, style.sheet!.cssRules.length)
+    sheet.insertRule(
+      `${style1.rule} { ${styleData.cssText} }`,
+      sheet.cssRules.length,
+    )
   }
   return attachSubscription
 }
@@ -95,12 +112,12 @@ function attachStyleElement(style: HTMLStyleElement): IDisposable {
     if (index !== -1) {
       _addedStyles.splice(index, 1)
     }
-    head.removeChild(style);
+    head.removeChild(style)
   })
 }
 
 function getStyleDeclaration(style: StyleDeclaration): StyleDeclaration {
-  const span = document.createElement('span')
+  const span = document.createElement("span")
   const spanStyle = span.style
   let key: keyof StyleDeclaration
   for (key in style) {
@@ -109,25 +126,25 @@ function getStyleDeclaration(style: StyleDeclaration): StyleDeclaration {
   return spanStyle
 }
 
-
 let styleIdCounter = 0
 
 function generateStyleId() {
-  return "elemiq-style-" + ++styleIdCounter
+  return `elemiq-style-${++styleIdCounter}`
 }
 
 function getFirstWord(str: string): string {
   for (let i = 0; i < str.length; i++) {
     const charCode = str.charCodeAt(i)
-    let aLetter = (charCode >= 65 && charCode < 91) || (charCode >= 97 && charCode < 123);
+    const aLetter =
+      (charCode >= 65 && charCode < 91) || (charCode >= 97 && charCode < 123)
     if (aLetter) {
       continue
     }
-    let aDigit = charCode >= 48 && charCode < 58
+    const aDigit = charCode >= 48 && charCode < 58
     if (aDigit) {
       continue
     }
-    let isUnderscoreOrHyphen = charCode === 95 || charCode === 45
+    const isUnderscoreOrHyphen = charCode === 95 || charCode === 45
     if (isUnderscoreOrHyphen) {
       continue
     }

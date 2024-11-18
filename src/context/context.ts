@@ -1,7 +1,14 @@
-import { createConstVar, createDelegate, DelegateVariable, isVariableOf, Var } from "@tioniq/eventiq";
+import {
+  createConstVar,
+  createDelegate,
+  type DelegateVariable,
+  isVariableOf,
+  type Var,
+} from "@tioniq/eventiq"
 
-export type ContextType = Record<string, any>
+export type ContextType = object
 
+// biome-ignore lint/complexity/noBannedTypes: Should be empty
 export type Context<T extends ContextType> = {}
 
 export type ContextValue<T extends ContextType> = {
@@ -11,15 +18,28 @@ export type ContextValue<T extends ContextType> = {
 const setContextValueSymbol = Symbol("setContextValue")
 const getContextSymbol = Symbol("getContextProvider")
 
-export function getContext<T extends ContextType>(value: ContextValue<T>): Context<T> {
-  return (value as any)[getContextSymbol]
+interface InternalContextValue<T extends ContextType> {
+  [getContextSymbol]: Context<T>
+  [setContextValueSymbol](value: T | null): void
 }
 
-export function setContextValue<T extends ContextType>(contextValue: ContextValue<T>, value: T | null): void {
-  (contextValue as any)[setContextValueSymbol](value)
+export function getContext<T extends ContextType>(
+  value: ContextValue<T>,
+): Context<T> {
+  return (value as InternalContextValue<T>)[getContextSymbol]
 }
 
-export function useContext<T extends ContextType>(context: Context<T>, defaultValue?: T | null): ContextValue<T> {
+export function setContextValue<T extends ContextType>(
+  contextValue: ContextValue<T>,
+  value: T | null,
+): void {
+  ;(contextValue as InternalContextValue<T>)[setContextValueSymbol](value)
+}
+
+export function useContext<T extends ContextType>(
+  context: Context<T>,
+  defaultValue?: T | null,
+): ContextValue<T> {
   const pro = context as ContextImpl<T>
   const type = typeof pro.__key
   if (type !== "string") {
@@ -27,7 +47,7 @@ export function useContext<T extends ContextType>(context: Context<T>, defaultVa
   }
   const initialValue: T | null = defaultValue ?? pro.__defaultValue ?? null
   const val = {} as ContextValue<T>
-  const dataMap = new Map<string, DelegateVariable<any>>()
+  const dataMap = new Map<string, DelegateVariable<unknown>>()
   return new Proxy<ContextValue<T>>(val, {
     get(_, key) {
       if (typeof key !== "string") {
@@ -35,17 +55,21 @@ export function useContext<T extends ContextType>(context: Context<T>, defaultVa
           return context
         }
         if (key === setContextValueSymbol) {
-          return function (newValue: any) {
+          return (newValue: T) => {
             if (!newValue) {
-              for (let dataMapElement of dataMap) {
-                dataMapElement[1].setSource(null)
+              for (const dataMapElement of dataMap.values()) {
+                dataMapElement.setSource(null)
               }
               return true
             }
-            for (let key in newValue) {
+            for (const key in newValue) {
               let value = dataMap.get(key)
               if (!value) {
-                value = createDelegate(initialValue ? initialValue[key as keyof T] : null)
+                if (initialValue && key in initialValue) {
+                  value = createDelegate(initialValue[key])
+                } else {
+                  value = createDelegate(null)
+                }
                 dataMap.set(key, value)
               }
               const v = newValue[key]
@@ -64,7 +88,7 @@ export function useContext<T extends ContextType>(context: Context<T>, defaultVa
       if (value) {
         return value
       }
-      if (!initialValue) {
+      if (!initialValue || !(key in initialValue)) {
         value = createDelegate(null)
         dataMap.set(key, value)
         return value
@@ -72,19 +96,22 @@ export function useContext<T extends ContextType>(context: Context<T>, defaultVa
       value = createDelegate(initialValue[key as keyof T])
       dataMap.set(key, value)
       return value
-    }
+    },
   })
 }
 
 function randomUUID(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0
-    const v = c === "x" ? r : (r & 0x3 | 0x8)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === "x" ? r : (r & 0x3) | 0x8
     return v.toString(16)
   })
 }
 
-export function createContext<T extends ContextType>(key: string, defaultValue?: T | null): Context<T> {
+export function createContext<T extends ContextType>(
+  key: string,
+  defaultValue?: T | null,
+): Context<T> {
   if (!key) {
     throw new Error("Context key cannot be empty")
   }
@@ -96,7 +123,7 @@ export function createContext<T extends ContextType>(key: string, defaultValue?:
     },
     get __id(): string {
       return id
-    }
+    },
   }
   return result
 }

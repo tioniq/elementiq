@@ -22,7 +22,7 @@ export class DetachedFromDOMEvent extends Event {
 
 export function runMutationObserver() {
   const mutationObserver = new MutationObserver((mutations, observer) => {
-    for (let mutation of mutations) {
+    for (const mutation of mutations) {
       if (mutation.type === "childList") {
         if (mutation.addedNodes.length > 0) {
           for (let i = 0; i < mutation.addedNodes.length; ++i) {
@@ -46,7 +46,7 @@ export function runMutationObserver() {
 
   mutationObserver.observe(document, {
     childList: true,
-    subtree: true
+    subtree: true,
   })
 }
 
