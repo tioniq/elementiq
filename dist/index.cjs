@@ -271,7 +271,9 @@ if (!("dispose" in Symbol)) {
   Symbol.dispose = disposeSymbol;
 }
 if (!("asyncDispose" in Symbol)) {
-  const asyncDisposeSymbol = Symbol("Symbol.asyncDispose");
+  const asyncDisposeSymbol = Symbol(
+    "Symbol.asyncDispose"
+  );
   Symbol.asyncDispose = asyncDisposeSymbol;
 }
 var Disposiq = class {
@@ -293,7 +295,7 @@ var AsyncDisposiq = class extends Disposiq {
 var AbortDisposable = class extends Disposiq {
   constructor(controller) {
     super();
-    this._controller = controller;
+    this._controller = controller != null ? controller : new AbortController();
   }
   /**
    * Returns true if the signal is aborted
@@ -493,7 +495,7 @@ function justDisposeAll(disposables) {
   }
 }
 function disposeAll(disposables) {
-  let size = disposables.length;
+  const size = disposables.length;
   if (size === 0) {
     return;
   }
@@ -585,15 +587,13 @@ var DisposableStore = class _DisposableStore extends Disposiq {
       return;
     }
     const first = disposables[0];
-    if (Array.isArray(first)) {
-      disposables = first;
-    }
+    const value = Array.isArray(first) ? first : disposables;
     if (this._disposed) {
-      justDisposeAll(disposables);
+      justDisposeAll(value);
       return;
     }
-    for (let i2 = 0; i2 < disposables.length; i2++) {
-      const disposable = disposables[i2];
+    for (let i2 = 0; i2 < value.length; i2++) {
+      const disposable = value[i2];
       if (!disposable) {
         continue;
       }
@@ -896,13 +896,23 @@ var DisposableMapStore = class extends Disposiq {
 };
 function addEventListener(target, type, listener, options) {
   target.addEventListener(type, listener, options);
-  return new DisposableAction(() => target.removeEventListener(type, listener, options));
+  return new DisposableAction(
+    () => target.removeEventListener(type, listener, options)
+  );
 }
 Disposiq.prototype.disposeWith = function(container) {
-  return container.add(this);
+  container.add(this);
 };
 Disposiq.prototype.toFunction = function() {
-  return () => this.dispose();
+  return () => {
+    this.dispose();
+  };
+};
+var g = typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : void 0;
+Disposiq.prototype.disposeIn = function(ms) {
+  g.setTimeout(() => {
+    this.dispose();
+  }, ms);
 };
 var ExceptionHandlerManager = class {
   /**
@@ -2710,10 +2720,10 @@ function Button(props) {
 function lightenColor(hex, percent) {
   const num = Number.parseInt(hex.slice(1), 16);
   const r = (num >> 16) + Math.round(255 * percent);
-  const g = (num >> 8 & 255) + Math.round(255 * percent);
+  const g2 = (num >> 8 & 255) + Math.round(255 * percent);
   const b2 = (num & 255) + Math.round(255 * percent);
   const newR = Math.min(255, Math.max(0, r));
-  const newG = Math.min(255, Math.max(0, g));
+  const newG = Math.min(255, Math.max(0, g2));
   const newB = Math.min(255, Math.max(0, b2));
   const newHex = newR << 16 | newG << 8 | newB;
   return `#${newHex.toString(16).padStart(6, "0")}`;
