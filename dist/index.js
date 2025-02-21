@@ -195,6 +195,7 @@ var AsyncDisposableAction = class extends AsyncDisposiq {
 var ObjectDisposedException = class extends Error {
   constructor(message) {
     super(message || "Object disposed");
+    this.name = "ObjectDisposedException";
   }
 };
 var Node2 = class {
@@ -511,6 +512,32 @@ var DisposableStore = class _DisposableStore extends Disposiq {
     }
   }
   /**
+   * Accepts a function that returns a disposable and adds it to the store. If the function is asynchronous,
+   * it waits for the result and then adds it to the store. Returns a Promise if the supplier is asynchronous,
+   * otherwise returns the disposable directly.
+   * @param supplier A function that returns a disposable or a promise resolving to a disposable.
+   * @returns The disposable or a promise resolving to the disposable.
+   */
+  use(supplier) {
+    const result = supplier();
+    if (result instanceof Promise) {
+      return result.then((disposable) => {
+        if (this._disposed) {
+          justDispose(disposable);
+          return disposable;
+        }
+        this._disposables.push(disposable);
+        return disposable;
+      });
+    }
+    if (this._disposed) {
+      justDispose(result);
+      return result;
+    }
+    this._disposables.push(result);
+    return result;
+  }
+  /**
    * Dispose all disposables in the store. The store does not become disposed. The disposables are removed from the
    * store. The store can continue to be used after this method is called. This method is useful when the store is
    * used as a temporary container. The store can be disposed later by calling the dispose method. Calling add during
@@ -722,6 +749,67 @@ var DisposableMapStore = class extends Disposiq {
     this._map.clear();
   }
 };
+var Disposable = class extends Disposiq {
+  constructor() {
+    super(...arguments);
+    this._store = new DisposableStore();
+  }
+  /**
+   * Returns true if the object has been disposed.
+   */
+  get disposed() {
+    return this._store.disposed;
+  }
+  /**
+   * Register a disposable object. The object will be disposed when the current object is disposed.
+   * @param t a disposable object
+   * @protected inherited classes should use this method to register disposables
+   * @returns the disposable object
+   */
+  register(t) {
+    this._store.addOne(t);
+    return t;
+  }
+  registerAsync(promiseOrAction) {
+    return __async(this, null, function* () {
+      if (typeof promiseOrAction === "function") {
+        return this._store.use(promiseOrAction);
+      }
+      if (promiseOrAction instanceof Promise) {
+        const disposable = yield promiseOrAction;
+        this._store.addOne(disposable);
+        return disposable;
+      }
+      this._store.addOne(promiseOrAction);
+      return promiseOrAction;
+    });
+  }
+  /**
+   * Throw an exception if the object has been disposed.
+   * @param message the message to include in the exception
+   * @protected inherited classes can use this method to throw an exception if the object has been disposed
+   */
+  throwIfDisposed(message) {
+    this._store.throwIfDisposed(message);
+  }
+  /**
+   * Add disposables to the store. If the store has already been disposed, the disposables will be disposed.
+   * @param disposable a disposable to add
+   */
+  addDisposable(disposable) {
+    this._store.addOne(disposable);
+  }
+  /**
+   * Add disposables to the store. If the store has already been disposed, the disposables will be disposed.
+   * @param disposables disposables to add
+   */
+  addDisposables(...disposables) {
+    this._store.addAll(disposables);
+  }
+  dispose() {
+    this._store.dispose();
+  }
+};
 function addEventListener(target, type, listener, options) {
   target.addEventListener(type, listener, options);
   return new DisposableAction(
@@ -729,6 +817,10 @@ function addEventListener(target, type, listener, options) {
   );
 }
 Disposiq.prototype.disposeWith = function(container) {
+  if (container instanceof Disposable) {
+    container.addDisposable(this);
+    return;
+  }
   container.add(this);
 };
 Disposiq.prototype.toFunction = function() {
@@ -736,11 +828,18 @@ Disposiq.prototype.toFunction = function() {
     this.dispose();
   };
 };
-var g = typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : void 0;
+var g = globalThis;
 Disposiq.prototype.disposeIn = function(ms) {
   g.setTimeout(() => {
     this.dispose();
   }, ms);
+};
+Disposiq.prototype.toPlainObject = function() {
+  return {
+    dispose: () => {
+      this.dispose();
+    }
+  };
 };
 var ExceptionHandlerManager = class {
   /**
@@ -1270,7 +1369,6 @@ function findContextProvider(element2, context) {
     }
     el = el.parentElement;
   }
-  console.error("No context provider found");
   return null;
 }
 function ContextProvider(props) {
@@ -1438,8 +1536,7 @@ function applyStyle(element2, lifecycle, style2) {
     return;
   }
   if (!isVariableOf5(style2)) {
-    let styleKey;
-    for (styleKey in style2) {
+    for (const styleKey in style2) {
       const value = style2[styleKey];
       if (!isVariableOf5(value)) {
         if (value === void 0) {
