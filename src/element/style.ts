@@ -16,8 +16,8 @@ export function applyStyle(
     return
   }
   if (!isVariableOf<ElementStyle>(style)) {
-    let styleKey: keyof ElementStyle & string
-    for (styleKey in style) {
+    // let styleKey: keyof ElementStyle & string
+    for (const styleKey in style) {
       const value = style[styleKey]
       if (!isVariableOf<string | undefined>(value)) {
         if (value === undefined) {

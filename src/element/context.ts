@@ -54,7 +54,7 @@ function findContextProvider(
     }
     el = el.parentElement
   }
-  console.error("No context provider found")
+  // console.error("No context provider found")
   return null
 }
 
@@ -106,7 +106,7 @@ interface IContextProvider<T extends ContextType> {
 }
 
 function createProvider<T extends ContextType>(context: Context<T>, value: T) {
-  const { key, id } = getContextData(context)
+  const {key, id} = getContextData(context)
   const dataKey = getDataKey(key)
   const provider: IContextProvider<T> = {
     context: context,
