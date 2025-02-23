@@ -65,9 +65,6 @@ function checkAndDispatchAttachedToDOMEvent(node: HTMLElement) {
 }
 
 function checkAndDispatchDetachedFromDOMEvent(node: HTMLElement) {
-  if (node.dataset[domListenKey] === "t") {
-    node.dispatchEvent(new DetachedFromDOMEvent())
-  }
   if (node.children.length > 0) {
     for (let i = 0; i < node.children.length; ++i) {
       const child = node.children[i]
@@ -75,5 +72,8 @@ function checkAndDispatchDetachedFromDOMEvent(node: HTMLElement) {
         checkAndDispatchDetachedFromDOMEvent(child)
       }
     }
+  }
+  if (node.dataset[domListenKey] === "t") {
+    node.dispatchEvent(new DetachedFromDOMEvent())
   }
 }

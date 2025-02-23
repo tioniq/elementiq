@@ -123,6 +123,7 @@ function createElementLifecycle(element: HTMLElement): Var<boolean> {
       element.addEventListener("detachedFromDom", detachListener)
       vary.value = element.isConnected
       return createDisposiq(() => {
+        // delete element.dataset[domListenKey]
         element.removeEventListener("attachedToDom", attachListener)
         element.removeEventListener("detachedFromDom", detachListener)
       })
