@@ -232,9 +232,6 @@ function checkAndDispatchAttachedToDOMEvent(node) {
   }
 }
 function checkAndDispatchDetachedFromDOMEvent(node) {
-  if (node.dataset[domListenKey] === "t") {
-    node.dispatchEvent(new DetachedFromDOMEvent());
-  }
   if (node.children.length > 0) {
     for (let i2 = 0; i2 < node.children.length; ++i2) {
       const child = node.children[i2];
@@ -242,6 +239,9 @@ function checkAndDispatchDetachedFromDOMEvent(node) {
         checkAndDispatchDetachedFromDOMEvent(child);
       }
     }
+  }
+  if (node.dataset[domListenKey] === "t") {
+    node.dispatchEvent(new DetachedFromDOMEvent());
   }
 }
 
