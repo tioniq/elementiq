@@ -1,4 +1,4 @@
-import { ClassComponent, ElementChild, ElementOptions, FunctionComponent, } from "../index.ts"
+import { ClassComponent, ElementOptions, ElementSimpleValue, ElementValue, FunctionComponent, } from "../index.ts"
 import { renderJsx } from "./render.ts"
 
 export namespace JSX {
@@ -7,7 +7,7 @@ export namespace JSX {
     | FunctionComponent
     | ClassComponent
 
-  export type Element = Node | string | number | null | boolean
+  export type Element = ElementValue | ElementSimpleValue
 
   export interface ElementClass extends ClassComponent {
   }

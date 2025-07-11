@@ -153,5 +153,6 @@ export type ElementOptions<T extends ElementType = ElementType> =
 export type StubElement = symbol
 
 export type ElementValue<T extends ElementType = ElementType> = T
+export type ElementSimpleValue = Node | string | number | null | boolean
 
 export type ElementType = HTMLElement | SVGElement | MathMLElement
