@@ -2650,7 +2650,23 @@ var elements = {
 function render(value, parent) {
   if (typeof value === "function") {
     const element2 = value({});
-    parent.appendChild(element2);
+    if (element2 instanceof Node) {
+      parent.appendChild(element2);
+      return;
+    }
+    if (!element2) {
+      return;
+    }
+    if (typeof element2 === "string") {
+      parent.appendChild(document.createTextNode(element2));
+      return;
+    }
+    if (typeof element2 === "number") {
+      parent.appendChild(document.createTextNode(String(element2)));
+      return;
+    }
+    console.warn("Invalid element type returned from function component:", element2);
+    parent.appendChild(document.createTextNode(`${element2}`));
     return;
   }
   parent.appendChild(value);

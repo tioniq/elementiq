@@ -7,7 +7,23 @@ export function render<T extends HTMLElement>(
 ): void {
   if (typeof value === "function") {
     const element = value({})
-    parent.appendChild(element)
+    if (element instanceof Node) {
+      parent.appendChild(element)
+      return
+    }
+    if (!element) {
+      return
+    }
+    if (typeof element === "string") {
+      parent.appendChild(document.createTextNode(element))
+      return
+    }
+    if (typeof element === "number") {
+      parent.appendChild(document.createTextNode(String(element)))
+      return
+    }
+    console.warn("Invalid element type returned from function component:", element)
+    parent.appendChild(document.createTextNode(`${element}`))
     return
   }
   parent.appendChild(value)

@@ -432,10 +432,10 @@ declare function createController<T extends object>(): T;
 declare function useController<T>(controller: T, handler: T): void;
 declare function useFunctionController<T>(controller: T, handler: (key: keyof T, ...args: unknown[]) => unknown): void;
 
-type FunctionComponent<P = object> = (props: P) => ElementValue;
+type FunctionComponent<P = object> = (props: P) => JSX.Element;
 interface ClassComponent<P = object> {
     new (props: P): ClassComponent;
-    render(): ElementValue;
+    render(): JSX.Element;
 }
 
 declare function render<T extends HTMLElement>(value: ElementValue<T> | FunctionComponent, parent: HTMLElement): void;
