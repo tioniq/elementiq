@@ -120,6 +120,7 @@ type ElementOptions<T extends ElementType = ElementType> = ObjectValuesVariableO
 };
 type StubElement = symbol;
 type ElementValue<T extends ElementType = ElementType> = T;
+type ElementSimpleValue = Node | string | number | null | boolean;
 type ElementType = HTMLElement | SVGElement | MathMLElement;
 
 type StyleDeclaration = Partial<CSSStyleDeclaration>;
@@ -492,7 +493,7 @@ declare namespace Button {
 
 declare namespace JSX {
     type ElementType = keyof IntrinsicElements | FunctionComponent | ClassComponent;
-    type Element = Node | string | number | null | boolean;
+    type Element = ElementValue | ElementSimpleValue;
     interface ElementClass extends ClassComponent {
     }
     interface ElementAttributesProperty {
@@ -531,4 +532,4 @@ declare function applyProperty<T extends keyof HTMLElementTagNameMap, K extends 
 type OnMountHandler = (this: HTMLElement) => IDisposable | undefined;
 declare function applyOnMount(element: HTMLElement, lifecycle: Var<boolean>, onMount: VarOrVal<OnMountHandler>): void;
 
-export { Button, type ClassComponent, type ClassNameMap, type Context, ContextProvider, type ContextType, type ContextValue, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementStyle, type ElementType, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type Theme, ThemeContext, type ThemeContextValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyClasses, applyController, applyDataset, applyModification, applyOnMount, applyParent, applyProperty, applyStyle, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createContext, createController, createThemeContext, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, getThemeStyle, getThemeStyleFromContext, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, theme, themeStyle, time, title, tr, track, u, ul, useContext, useController, useFunctionController, var_, video, wbr };
+export { Button, type ClassComponent, type ClassNameMap, type Context, ContextProvider, type ContextType, type ContextValue, type ElementChild, type ElementChildren, type ElementController, type ElementDataset, type ElementOptions, type ElementProps, type ElementSimpleValue, type ElementStyle, type ElementType, type ElementValue, type FunctionComponent, JSX, type Modifier, type NonUndefined, type ObjectValuesVariableOrValue, type ObjectWritableProps, type ReadonlyKeys, type StubElement, type Style, type StyleDeclaration, type Theme, ThemeContext, type ThemeContextValue, type WritableKeys, a, abbr, addModifier, addRawStyle, addStyles, addTagModifier, address, applyClasses, applyController, applyDataset, applyModification, applyOnMount, applyParent, applyProperty, applyStyle, area, article, aside, audio, b, base, bdi, bdo, blockquote, body, br, button, canvas, caption, cite, code, col, colgroup, createContext, createController, createThemeContext, data, datalist, dd, del, details, dfn, dialog, div, dl, dt, element, elements, em, embed, fieldset, figcaption, figure, footer, form, getThemeStyle, getThemeStyleFromContext, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, img, input, ins, jsx, jsxDEV, jsxs, kbd, label, legend, li, link, main, makeClassStyles, map, mark, menu, meta, meter, nav, noscript, object, ol, optgroup, option, output, p, picture, pre, progress, q, removeAllGeneratedStyles, render, renderJsx, rp, rt, ruby, s, samp, script, search, section, select, slot, small, source, span, strong, style, sub, summary, sup, table, tbody, td, template, text, textarea, tfoot, th, thead, theme, themeStyle, time, title, tr, track, u, ul, useContext, useController, useFunctionController, var_, video, wbr };
