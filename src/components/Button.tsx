@@ -4,8 +4,8 @@ import type {
   ElementController,
   ElementStyle,
 } from "@/types/element.ts"
-import { combine, createConst, type Var, type VarOrVal } from "@tioniq/eventiq"
-import { toDefinedVariable, toVariable } from "@/variable/variable.ts"
+import { combine, createConst, toVariable, type Var, type VarOrVal } from "@tioniq/eventiq"
+import { toDefinedVariable } from "@/variable/variable.ts"
 import { button } from "@/dom/dom-elements.ts"
 import { buttonStyles } from "@/components/button-styles.ts"
 import {

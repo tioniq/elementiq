@@ -1,5 +1,5 @@
 import * as _tioniq_eventiq from '@tioniq/eventiq';
-import { Var, Variable, VarOrVal, Vary } from '@tioniq/eventiq';
+import { Var, VarOrVal, Variable, Vary } from '@tioniq/eventiq';
 import { DisposableLike, IDisposable, IDisposablesContainer } from '@tioniq/disposiq';
 
 type ContextType = object;

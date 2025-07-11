@@ -18,8 +18,8 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/index.ts
-var src_exports = {};
-__export(src_exports, {
+var index_exports = {};
+__export(index_exports, {
   Button: () => Button,
   ContextProvider: () => ContextProvider,
   ThemeContext: () => ThemeContext,
@@ -168,7 +168,7 @@ __export(src_exports, {
   video: () => video,
   wbr: () => wbr
 });
-module.exports = __toCommonJS(src_exports);
+module.exports = __toCommonJS(index_exports);
 
 // src/lifecycle/index.ts
 var domListenKey = "elemiqDomListen";
@@ -232,9 +232,6 @@ function checkAndDispatchAttachedToDOMEvent(node) {
   }
 }
 function checkAndDispatchDetachedFromDOMEvent(node) {
-  if (node.dataset[domListenKey] === "t") {
-    node.dispatchEvent(new DetachedFromDOMEvent());
-  }
   if (node.children.length > 0) {
     for (let i2 = 0; i2 < node.children.length; ++i2) {
       const child = node.children[i2];
@@ -242,6 +239,9 @@ function checkAndDispatchDetachedFromDOMEvent(node) {
         checkAndDispatchDetachedFromDOMEvent(child);
       }
     }
+  }
+  if (node.dataset[domListenKey] === "t") {
+    node.dispatchEvent(new DetachedFromDOMEvent());
   }
 }
 
@@ -367,6 +367,7 @@ var AsyncDisposableAction = class extends AsyncDisposiq {
 var ObjectDisposedException = class extends Error {
   constructor(message) {
     super(message || "Object disposed");
+    this.name = "ObjectDisposedException";
   }
 };
 var Node2 = class {
@@ -479,6 +480,20 @@ function justDispose(disposable) {
     disposable();
   } else {
     disposable.dispose();
+  }
+}
+function justDisposeSafe(disposable, onError) {
+  if (!disposable) {
+    return;
+  }
+  try {
+    if (typeof disposable === "function") {
+      disposable();
+    } else {
+      disposable.dispose();
+    }
+  } catch (e) {
+    onError == null ? void 0 : onError(e);
   }
 }
 function justDisposeAll(disposables) {
@@ -636,6 +651,32 @@ var DisposableStore = class _DisposableStore extends Disposiq {
     this._disposables.push(disposable);
   }
   /**
+   * Adds a disposable resource safely to the internal disposables collection.
+   * If the containing object is already disposed, the given disposable resource
+   * will be disposed immediately.
+   * Safely means that the method will not throw an exception if an error occurs
+   * during disposal of the resource.
+   * You CAN NOT remove the disposable from the store after adding it with this method.
+   *
+   * @param {DisposableLike | null | undefined} disposable - The disposable resource to be added.
+   *   If null or undefined, the method does nothing.
+   * @param {(error: unknown) => void} [onError] - An optional callback that is invoked when an
+   *   error occurs during disposal of the resource.
+   * @return {void}
+   */
+  addOneSafe(disposable, onError) {
+    if (!disposable) {
+      return;
+    }
+    if (this._disposed) {
+      justDisposeSafe(disposable, onError);
+      return;
+    }
+    this._disposables.push(() => {
+      justDisposeSafe(disposable, onError);
+    });
+  }
+  /**
    * Remove a disposable from the store. If the disposable is found and removed, it will NOT be disposed
    * @param disposable a disposable to remove
    * @returns true if the disposable was found and removed
@@ -681,6 +722,32 @@ var DisposableStore = class _DisposableStore extends Disposiq {
     if (this._disposed) {
       throw new ObjectDisposedException(message);
     }
+  }
+  /**
+   * Accepts a function that returns a disposable and adds it to the store. If the function is asynchronous,
+   * it waits for the result and then adds it to the store. Returns a Promise if the supplier is asynchronous,
+   * otherwise returns the disposable directly.
+   * @param supplier A function that returns a disposable or a promise resolving to a disposable.
+   * @returns The disposable or a promise resolving to the disposable.
+   */
+  use(supplier) {
+    const result = supplier();
+    if (result instanceof Promise) {
+      return result.then((disposable) => {
+        if (this._disposed) {
+          justDispose(disposable);
+          return disposable;
+        }
+        this._disposables.push(disposable);
+        return disposable;
+      });
+    }
+    if (this._disposed) {
+      justDispose(result);
+      return result;
+    }
+    this._disposables.push(result);
+    return result;
   }
   /**
    * Dispose all disposables in the store. The store does not become disposed. The disposables are removed from the
@@ -736,9 +803,66 @@ var EmptyDisposable = class extends AsyncDisposiq {
 };
 var emptyDisposableImpl = new EmptyDisposable();
 var emptyDisposable = Object.freeze(emptyDisposableImpl);
+var customDisposeGetter = Object.freeze(() => false);
+var CancellationTokenDisposable = class extends Disposiq {
+  constructor(token) {
+    super();
+    if (token == null) {
+      throw new Error("Invalid token");
+    }
+    this._token = token;
+    const isCancelledType = typeof token.isCancelled;
+    if (isCancelledType === "function") {
+      this._disposedGetter = () => token.isCancelled();
+    } else if (isCancelledType === "boolean") {
+      this._disposedGetter = () => token.isCancelled;
+    } else if (typeof token.onCancel === "function") {
+      let cancelled = false;
+      token.onCancel(() => {
+        cancelled = true;
+      });
+      this._disposedGetter = () => cancelled;
+    } else {
+      this._disposedGetter = customDisposeGetter;
+    }
+  }
+  get disposed() {
+    return this._disposedGetter();
+  }
+  /**
+   * Throw an exception if the object has been disposed.
+   * @param message the message to include in the exception
+   */
+  throwIfDisposed(message) {
+    if (this.disposed) {
+      throw new ObjectDisposedException(message);
+    }
+  }
+  dispose() {
+    if (this._disposedGetter === customDisposeGetter) {
+      this._disposedGetter = () => true;
+    }
+    this._token.cancel();
+  }
+};
 function createDisposable(disposableLike) {
   if (!disposableLike) {
     return emptyDisposable;
+  }
+  if (typeof disposableLike === "object" && "dispose" in disposableLike) {
+    return disposableLike;
+  }
+  return createDisposiqFrom(disposableLike);
+}
+function createDisposiq(disposableLike) {
+  return createDisposiqFrom(disposableLike);
+}
+function createDisposiqFrom(disposableLike) {
+  if (!disposableLike) {
+    return emptyDisposable;
+  }
+  if (disposableLike instanceof Disposiq) {
+    return disposableLike;
   }
   if (typeof disposableLike === "function") {
     return new DisposableAction(disposableLike);
@@ -747,7 +871,9 @@ function createDisposable(disposableLike) {
     return emptyDisposable;
   }
   if ("dispose" in disposableLike) {
-    return disposableLike;
+    return new DisposableAction(() => {
+      disposableLike.dispose();
+    });
   }
   if (Symbol.dispose in disposableLike) {
     return new DisposableAction(() => {
@@ -765,49 +891,8 @@ function createDisposable(disposableLike) {
   if (disposableLike instanceof AbortController) {
     return new AbortDisposable(disposableLike);
   }
-  return emptyDisposable;
-}
-function createDisposiq(disposableLike) {
-  if (!disposableLike) {
-    return emptyDisposable;
-  }
-  if (disposableLike instanceof Disposiq) {
-    return disposableLike;
-  }
-  if (typeof disposableLike === "function") {
-    return new DisposableAction(disposableLike);
-  }
-  if (typeof disposableLike !== "object") {
-    return emptyDisposable;
-  }
-  const hasDispose = "dispose" in disposableLike && typeof disposableLike.dispose === "function";
-  const hasSymbolDispose = Symbol.dispose in disposableLike;
-  if (hasDispose && hasSymbolDispose) {
-    return new class extends Disposiq {
-      dispose() {
-        disposableLike.dispose();
-      }
-      [Symbol.dispose]() {
-        disposableLike[Symbol.dispose]();
-      }
-    }();
-  }
-  if (hasDispose) {
-    return new DisposableAction(() => disposableLike.dispose());
-  }
-  if (hasSymbolDispose) {
-    return new DisposableAction(() => disposableLike[Symbol.dispose]());
-  }
-  if (Symbol.asyncDispose in disposableLike) {
-    return new AsyncDisposableAction(() => __async(this, null, function* () {
-      yield disposableLike[Symbol.asyncDispose]();
-    }));
-  }
-  if ("unref" in disposableLike) {
-    return new DisposableAction(() => disposableLike.unref());
-  }
-  if (disposableLike instanceof AbortController) {
-    return new AbortDisposable(disposableLike);
+  if ("cancel" in disposableLike) {
+    return new CancellationTokenDisposable(disposableLike);
   }
   return emptyDisposable;
 }
@@ -894,6 +979,67 @@ var DisposableMapStore = class extends Disposiq {
     this._map.clear();
   }
 };
+var Disposable = class extends Disposiq {
+  constructor() {
+    super(...arguments);
+    this._store = new DisposableStore();
+  }
+  /**
+   * Returns true if the object has been disposed.
+   */
+  get disposed() {
+    return this._store.disposed;
+  }
+  /**
+   * Register a disposable object. The object will be disposed when the current object is disposed.
+   * @param t a disposable object
+   * @protected inherited classes should use this method to register disposables
+   * @returns the disposable object
+   */
+  register(t) {
+    this._store.addOne(t);
+    return t;
+  }
+  registerAsync(promiseOrAction) {
+    return __async(this, null, function* () {
+      if (typeof promiseOrAction === "function") {
+        return this._store.use(promiseOrAction);
+      }
+      if (promiseOrAction instanceof Promise) {
+        const disposable = yield promiseOrAction;
+        this._store.addOne(disposable);
+        return disposable;
+      }
+      this._store.addOne(promiseOrAction);
+      return promiseOrAction;
+    });
+  }
+  /**
+   * Throw an exception if the object has been disposed.
+   * @param message the message to include in the exception
+   * @protected inherited classes can use this method to throw an exception if the object has been disposed
+   */
+  throwIfDisposed(message) {
+    this._store.throwIfDisposed(message);
+  }
+  /**
+   * Add disposables to the store. If the store has already been disposed, the disposables will be disposed.
+   * @param disposable a disposable to add
+   */
+  addDisposable(disposable) {
+    this._store.addOne(disposable);
+  }
+  /**
+   * Add disposables to the store. If the store has already been disposed, the disposables will be disposed.
+   * @param disposables disposables to add
+   */
+  addDisposables(...disposables) {
+    this._store.addAll(disposables);
+  }
+  dispose() {
+    this._store.dispose();
+  }
+};
 function addEventListener(target, type, listener, options) {
   target.addEventListener(type, listener, options);
   return new DisposableAction(
@@ -901,6 +1047,10 @@ function addEventListener(target, type, listener, options) {
   );
 }
 Disposiq.prototype.disposeWith = function(container) {
+  if (container instanceof Disposable) {
+    container.addDisposable(this);
+    return;
+  }
   container.add(this);
 };
 Disposiq.prototype.toFunction = function() {
@@ -908,11 +1058,62 @@ Disposiq.prototype.toFunction = function() {
     this.dispose();
   };
 };
-var g = typeof global !== "undefined" ? global : typeof window !== "undefined" ? window : typeof self !== "undefined" ? self : void 0;
+var g = globalThis;
 Disposiq.prototype.disposeIn = function(ms) {
   g.setTimeout(() => {
     this.dispose();
   }, ms);
+};
+Disposiq.prototype.toPlainObject = function() {
+  return {
+    dispose: () => {
+      this.dispose();
+    }
+  };
+};
+Disposiq.prototype.embedTo = function(obj) {
+  if ("dispose" in obj && typeof obj.dispose === "function") {
+    const objDispose = obj.dispose;
+    obj.dispose = () => {
+      objDispose.call(obj);
+      this.dispose();
+    };
+    return obj;
+  }
+  obj.dispose = () => {
+    this.dispose();
+  };
+  return obj;
+};
+Disposiq.prototype.toSafe = function(errorCallback) {
+  const self = this;
+  return new class extends Disposiq {
+    dispose() {
+      try {
+        self.dispose();
+      } catch (e) {
+        if (errorCallback) {
+          errorCallback(e);
+        }
+      }
+    }
+  }();
+};
+AsyncDisposiq.prototype.toSafe = function(errorCallback) {
+  const self = this;
+  return new class extends AsyncDisposiq {
+    dispose() {
+      return __async(this, null, function* () {
+        try {
+          yield self.dispose();
+        } catch (e) {
+          if (errorCallback) {
+            errorCallback(e);
+          }
+        }
+      });
+    }
+  }();
 };
 var ExceptionHandlerManager = class {
   /**
@@ -1438,7 +1639,6 @@ function findContextProvider(element2, context) {
     }
     el = el.parentElement;
   }
-  console.error("No context provider found");
   return null;
 }
 function ContextProvider(props) {
@@ -1606,8 +1806,7 @@ function applyStyle(element2, lifecycle, style2) {
     return;
   }
   if (!(0, import_eventiq6.isVariableOf)(style2)) {
-    let styleKey;
-    for (styleKey in style2) {
+    for (const styleKey in style2) {
       const value = style2[styleKey];
       if (!(0, import_eventiq6.isVariableOf)(value)) {
         if (value === void 0) {
@@ -2585,12 +2784,6 @@ var import_eventiq15 = require("@tioniq/eventiq");
 
 // src/variable/variable.ts
 var import_eventiq14 = require("@tioniq/eventiq");
-function toVariable(value) {
-  if ((0, import_eventiq14.isVariableOf)(value)) {
-    return value;
-  }
-  return (0, import_eventiq14.createConst)(value != null ? value : null);
-}
 function toDefinedVariable(value, defaultValue) {
   if ((0, import_eventiq14.isVariableOf)(value)) {
     return value.map((v) => v != null ? v : defaultValue);
@@ -2700,7 +2893,7 @@ function Button(props) {
   const textDecoration = appearance.map(
     (a2) => a2 === "link" ? "underline" : "none"
   );
-  const style2 = toVariable(props.style).map((s2) => ({
+  const style2 = (0, import_eventiq15.toVariable)(props.style).map((s2) => ({
     backgroundColor,
     color: textColor,
     borderColor,

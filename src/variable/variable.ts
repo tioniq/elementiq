@@ -5,15 +5,6 @@ import {
   type VarOrVal,
 } from "@tioniq/eventiq"
 
-export function toVariable<T>(
-  value: VarOrVal<T> | undefined | null,
-): Var<T | null> {
-  if (isVariableOf<T>(value)) {
-    return value
-  }
-  return createConst(value ?? null)
-}
-
 /**
  * Converts a variable or value to a variable that will always have a value
  * @param value the variable or value
