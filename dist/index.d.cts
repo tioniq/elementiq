@@ -492,7 +492,7 @@ declare namespace Button {
 
 declare namespace JSX {
     type ElementType = keyof IntrinsicElements | FunctionComponent | ClassComponent;
-    type Element = ElementChild;
+    type Element = Node | string | number | null | boolean;
     interface ElementClass extends ClassComponent {
     }
     interface ElementAttributesProperty {

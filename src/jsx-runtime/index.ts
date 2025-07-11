@@ -7,7 +7,7 @@ export namespace JSX {
     | FunctionComponent
     | ClassComponent
 
-  export type Element = ElementChild
+  export type Element = Node | string | number | null | boolean
 
   export interface ElementClass extends ClassComponent {
   }
