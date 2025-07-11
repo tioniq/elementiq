@@ -18,12 +18,12 @@ export type NonUndefined<T> = T extends undefined ? never : T
 export type ObjectValuesVariableOrValue<Type extends Record<string, unknown>> =
   {
     [P in keyof Type]:
-      | Type[P]
-      | Variable<Type[P]>
-      | Variable<NonUndefined<Type[P]>>
+    | Type[P]
+    | Variable<Type[P]>
+    | Variable<NonUndefined<Type[P]>>
   }
 
-export type ElementChild = Node | string | undefined | null | boolean
+export type ElementChild = Node | string | number | undefined | null | boolean
 
 export type ElementChildren =
   | ElementChild
@@ -81,9 +81,9 @@ type SplitAtFirstKeyword<
   S extends string,
   Keywords extends readonly string[],
 > = Keywords extends [
-  infer FirstKeyword extends string,
-  ...infer RestKeywords extends string[],
-]
+    infer FirstKeyword extends string,
+    ...infer RestKeywords extends string[],
+  ]
   ? Split<S, FirstKeyword> extends never
     ? SplitAtFirstKeyword<S, RestKeywords> // Try the next keyword in the array
     : Split<S, FirstKeyword> // First match found, stop and return
@@ -119,37 +119,39 @@ type MappedEvents<T, ThisArg> = {
   ) => unknown
 }
 
-export type ElementProps<T extends HTMLElement = HTMLElement> = {
+export type ElementProps<T extends ElementType = ElementType> = {
   [P in WritableKeys<T> as T[P] extends string | number | boolean
     ? P
     : never]?: T[P]
 } & MissingAttributes & {
-    classes?: string[]
-    style?: ElementStyle
-    children?: ElementChildren
-  } & {
-    dataset?: ElementDataset
-  } & MappedEvents<HTMLElementEventMap, T> & {
-    modifierData?: unknown
-  } & {
-    onAttachedToDom?: (this: T, ev: AttachedToDOMEvent) => void
-    onDetachedFromDom?: (this: T, ev: DetachedFromDOMEvent) => void
-  } & {
-    onMount?: (this: T) => DisposableLike | undefined
-  }
+  classes?: string[]
+  style?: ElementStyle
+  children?: ElementChildren
+} & {
+  dataset?: ElementDataset
+} & MappedEvents<HTMLElementEventMap, T> & {
+  modifierData?: unknown
+} & {
+  onAttachedToDom?: (this: T, ev: AttachedToDOMEvent) => void
+  onDetachedFromDom?: (this: T, ev: DetachedFromDOMEvent) => void
+} & {
+  onMount?: (this: T) => DisposableLike | undefined
+}
 
-export type ElementController<T extends HTMLElement = HTMLElement> = {
+export type ElementController<T extends ElementType = ElementType> = {
   // biome-ignore lint/complexity/noBannedTypes: Should handle any function
   [P in keyof T as T[P] extends Function ? P : never]: T[P]
 }
 
-export type ElementOptions<T extends HTMLElement = HTMLElement> =
+export type ElementOptions<T extends ElementType = ElementType> =
   ObjectValuesVariableOrValue<ElementProps<T>> & {
-    parent?: ParentNode
-    controller?: ElementController<T>
-    context?: ContextValue<ContextType>
-  }
+  parent?: ParentNode
+  controller?: ElementController<T>
+  context?: ContextValue<ContextType>
+}
 
 export type StubElement = symbol
 
-export type ElementValue<T extends HTMLElement = HTMLElement> = T
+export type ElementValue<T extends ElementType = ElementType> = T
+
+export type ElementType = HTMLElement | SVGElement | MathMLElement

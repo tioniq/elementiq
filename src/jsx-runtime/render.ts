@@ -24,7 +24,8 @@ export function renderJsx<K extends JSX.ElementType>(
     })
   }
   if (typeof tag === "string") {
-    return element(tag, props as ElementOptions)
+    // TODO handle SVG and MathML tags
+    return element(tag, props as ElementOptions<HTMLElement>)
   }
   if (typeof tag !== "function") {
     return span({

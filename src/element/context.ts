@@ -7,13 +7,13 @@ import {
   setContextValue,
 } from "@/context/context.ts"
 import { emptyDisposable } from "@tioniq/disposiq"
-import type { ElementChildren } from "@/types/element.ts"
+import { ElementChildren, ElementType } from "@/types/element.ts"
 import { capitalize } from "@/utils/string-utils.ts"
 
 const providers: Map<string, IContextProvider<ContextType>> = new Map()
 
 export function applyContext(
-  element: HTMLElement,
+  element: ElementType,
   lifecycle: Var<boolean>,
   contextValue: ContextValue<ContextType>,
 ) {
@@ -35,13 +35,13 @@ export function applyContext(
 }
 
 function findContextProvider(
-  element: HTMLElement,
+  element: ElementType,
   context: Context<ContextType>,
 ): IContextProvider<ContextType> | null {
   if (!context) {
     return null
   }
-  let el: HTMLElement | null = element
+  let el: ElementType | null = element
   const keyToFind = getDataKey((context as ContextImpl<ContextType>).__key)
   while (el != null) {
     const providerId = el.dataset[keyToFind]

@@ -256,8 +256,11 @@ function createNode(value: ElementChild): Node {
   if (typeof value === "string") {
     return document.createTextNode(value)
   }
-  console.warn("Unsupported type of value.", { value })
-  return createEmptyNode()
+  if (typeof value === "number") {
+    return document.createTextNode(value.toString())
+  }
+  console.warn("Unsupported type of value.", { value, type: typeof value })
+  return document.createTextNode(`${value}`)
 }
 
 function insertAfter(node: Node, after: Node) {

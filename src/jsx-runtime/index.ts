@@ -1,10 +1,5 @@
+import { ClassComponent, ElementChild, ElementOptions, FunctionComponent, } from "../index.ts"
 import { renderJsx } from "./render.ts"
-import type {
-  ClassComponent,
-  ElementOptions,
-  ElementValue,
-  FunctionComponent,
-} from "../index.ts"
 
 export namespace JSX {
   export type ElementType =
@@ -12,9 +7,10 @@ export namespace JSX {
     | FunctionComponent
     | ClassComponent
 
-  export interface Element extends ElementValue {}
+  export type Element = ElementChild
 
-  export interface ElementClass extends ClassComponent {}
+  export interface ElementClass extends ClassComponent {
+  }
 
   export interface ElementAttributesProperty {
     // biome-ignore lint/complexity/noBannedTypes: No need to define a type for this property
